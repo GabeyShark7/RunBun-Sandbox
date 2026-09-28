@@ -1,3 +1,5 @@
+// THIS IS ASSIMP MAGIC. BEWARE!!!
+
 #include "Model.h"
 #include "Shader.h"
 #include "Console.h"

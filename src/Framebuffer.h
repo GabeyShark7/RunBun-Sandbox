@@ -10,8 +10,8 @@ public:
     void Resize(int width, int height); // rebuilds the framebuffer if the panel size changes
 
 private:
-    unsigned int fbo;      // framebuffer object ID
+    unsigned int fbo;      // Framebuffer object ID
     unsigned int texture;  // color texture attached to the framebuffer
-    unsigned int rbo;      // renderbuffer for depth (needed for correct 3D rendering later)
+    unsigned int rbo;      // renderbuffer for depth which is apearently needed for correct 3D rendering later
     int width, height;
 };

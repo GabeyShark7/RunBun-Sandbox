@@ -8,7 +8,7 @@ public:
     void Draw(glm::mat4 view, glm::mat4 projection);
 
 private:
-    //The buffer object ID's and compiled shader prgram ID
+    //The buffer object IDs and compiled shader prgram ID
     unsigned int VAO, VBO;
     unsigned int shaderProgram;
 };

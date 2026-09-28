@@ -17,7 +17,7 @@ void UpdateInput(GLFWwindow* window, float deltaTime) {
     bool isRightMouseDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
 
     if (isRightMouseDown && !rightMouseHeld && IsSceneHovered()) {
-        // only START look-mode if right-click began while hovering the Scene panel
+        // only START look mode if right click began while hovering the Scene panel
         rightMouseHeld = true;
         activeCamera->firstMouse = true;
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -29,5 +29,5 @@ void UpdateInput(GLFWwindow* window, float deltaTime) {
     }
 
     if (activeCamera && rightMouseHeld) activeCamera->ProcessKeyboard(window, deltaTime);
-    // WASD now only processed while right-click look-mode is active
+    // WASD now only processed while right-click look mode is active
 }

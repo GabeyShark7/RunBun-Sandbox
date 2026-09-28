@@ -3,6 +3,8 @@
 #include "FileDialog.h"
 #include <iostream>
 
+// not the best, i know. Will fix later. (probably not)
+
 void DrawMenuBar(GLFWwindow* sandbox_window, SceneRenderer& sceneRenderer) {
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 10.0f));
     ImGui::PushStyleColor(ImGuiCol_MenuBarBg, ImVec4(0.3f, 0.3f, 0.3f, 0.3f));

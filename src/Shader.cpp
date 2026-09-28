@@ -56,7 +56,7 @@ unsigned int LoadShader(const char* vertexPath, const char* fragmentPath) {
         std::cout << "Shader link error:\n" << infoLog << std::endl;
     }
 
-    //Shaders are now linked
+    // shaders are now linked
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 
