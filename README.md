@@ -12,6 +12,7 @@ A live 3D model viewer and editor built from scratch in C++ with OpenGL. Import 
 
 ## Planned
 - Multiplayer support so multiple people can view and edit the same scene together
+- **09/28/26 - I plan to add the networking soon. I've been very busy but will get that done. I'm thinking Rust with rust-libp2p, but might change my mind in the next couple days.**
 - Voice and text chat between connected users
 
 ## Built with
