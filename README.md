@@ -2,6 +2,9 @@
 
 A live 3D model viewer and editor built from scratch in C++ with OpenGL. Import FBX and glTF models, move around the scene with a first person camera, and edit object transforms and textures in real time through a custom ImGui based editor UI.
 
+## Clarity (PLEASE READ)
+- I did NOT make an early repo for this project. I wouldn't say it was very in depth before my first commit, but there was some decent progress done. I wasn't thinking at the time of making this a public project, but did manage to capture some early images of the UI and features. See the images below.
+
 ## Features
 - Custom OpenGL rendering pipeline with GLSL shaders
 - First person camera with WASD movement and mouse look
