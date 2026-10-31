@@ -20,4 +20,5 @@ public:
 
     void ProcessKeyboard(GLFWwindow* window, float deltaTime);
     void ProcessMouse(float xpos, float ypos);
+    void Reset(); // back to the starting position and direction
 };

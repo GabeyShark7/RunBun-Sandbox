@@ -13,6 +13,7 @@ class Mesh {
 public:
     void Init(std::vector<Vertex> vertices, std::vector<unsigned int> indices);
     void Draw();
+    void Destroy();
 
 private:
     unsigned int VAO, VBO, EBO;

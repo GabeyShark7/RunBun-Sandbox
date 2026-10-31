@@ -1,21 +1,25 @@
 #include "SceneRenderer.h"
 #include "TextureLoader.h"
+#include "Shader.h"
+#include "Console.h"
 #include <glad/glad.h>
 #include <glm/gtc/matrix_transform.hpp>
 
 void SceneRenderer::Init() {
     glEnable(GL_DEPTH_TEST);
     framebuffer.Init(800, 600);
-    triangle.Init();
+    shaderProgram = LoadShader("shaders/basic.vert", "shaders/basic.frag");
+    triangle.Init(shaderProgram);
 }
 
 void SceneRenderer::Render(ImVec2 panelSize) {
     int width = (int)panelSize.x;
     int height = (int)panelSize.y;
 
-    if (width > 0 && height > 0) {
-        framebuffer.Resize(width, height);
-    }
+    // Panel is collapsed/hidden, nothing to draw (and a 0 size would break the projection)
+    if (width <= 0 || height <= 0) return;
+
+    framebuffer.Resize(width, height);
 
     framebuffer.Bind();
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -35,7 +39,7 @@ void SceneRenderer::Render(ImVec2 panelSize) {
             modelMatrix = glm::rotate(modelMatrix, glm::radians(obj.rotation.z), glm::vec3(0, 0, 1));
             modelMatrix = glm::scale(modelMatrix, obj.scale);
 
-            obj.model.Draw(view, projection, modelMatrix);
+            obj.model.Draw(shaderProgram, view, projection, modelMatrix);
         }
     }
 
@@ -76,11 +80,14 @@ std::string SceneRenderer::GenerateUniqueName(const std::string& baseName) {
 }
 
 void SceneRenderer::LoadModel(const std::string& path) {
-    SceneObject obj;
-    obj.model.Load(path);
-
     size_t lastSlash = path.find_last_of("/\\");
     std::string baseName = (lastSlash == std::string::npos) ? path : path.substr(lastSlash + 1);
+
+    SceneObject obj;
+    if (!obj.model.Load(path)) {
+        LogMessage("Failed to import '" + baseName + "'.");
+        return;
+    }
 
     obj.name = GenerateUniqueName(baseName);
     obj.model.SetName(obj.name);
@@ -92,16 +99,21 @@ void SceneRenderer::LoadModel(const std::string& path) {
 void SceneRenderer::LoadTextureForSelected(const std::string& path) {
     if (selectedIndex < 0 || selectedIndex >= (int)objects.size()) return;
 
-    unsigned int texID = LoadTexture(path);
-
     size_t lastSlash = path.find_last_of("/\\");
     std::string texName = (lastSlash == std::string::npos) ? path : path.substr(lastSlash + 1);
+
+    unsigned int texID = LoadTexture(path);
+    if (texID == 0) {
+        LogMessage("Failed to load texture '" + texName + "'.");
+        return;
+    }
 
     objects[selectedIndex].model.AddTexture(texID, texName);
 }
 
 void SceneRenderer::RemoveObject(int index) {
     if (index < 0 || index >= (int)objects.size()) return;
+    objects[index].model.Destroy();
     objects.erase(objects.begin() + index);
 
     if (selectedIndex == index) selectedIndex = -1;

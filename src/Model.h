@@ -15,8 +15,8 @@ struct TextureInfo {
 
 class Model {
 public:
-    void Load(const std::string& path);
-    void Draw(glm::mat4 view, glm::mat4 projection, glm::mat4 modelMatrix);
+    bool Load(const std::string& path);
+    void Draw(unsigned int shaderProgram, glm::mat4 view, glm::mat4 projection, glm::mat4 modelMatrix);
 
     void AddTexture(unsigned int id, const std::string& name);
     void RemoveTexture(int index);
@@ -24,11 +24,10 @@ public:
     std::vector<TextureInfo>& GetTextures();
 
     void SetName(const std::string& n);
+    void Destroy(); // frees all meshes and textures on the GPU
 
 private:
     std::vector<Mesh> meshes;
-    unsigned int shaderProgram;
-    bool shaderLoaded = false;
 
     std::vector<TextureInfo> textures;
     bool conflictLogged = false;

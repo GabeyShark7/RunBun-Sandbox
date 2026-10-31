@@ -3,12 +3,12 @@
 
 class Triangle {
 public:
-    //Sets up the VAO/VBO/shader once at startup and draws the triangle every frame
-    void Init();
+    //Sets up the VAO/VBO once at startup and draws the triangle every frame
+    void Init(unsigned int shader);
     void Draw(glm::mat4 view, glm::mat4 projection);
 
 private:
-    //The buffer object IDs and compiled shader prgram ID
+    //The buffer object IDs and the shared shader program ID
     unsigned int VAO, VBO;
     unsigned int shaderProgram;
 };

@@ -5,7 +5,7 @@ static bool sceneHovered = false;
 static bool collapsed = false;
 static float expandedHeight = 600.0f;
 
-ImVec2 DrawSceneWindow(unsigned int textureID) {
+ImVec2 DrawSceneWindow(unsigned int textureID, Camera& camera) {
     ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
 
     unsigned int icon = GetDropdownIcon();
@@ -31,6 +31,18 @@ ImVec2 DrawSceneWindow(unsigned int textureID) {
     if (!collapsed) {
         panelSize = ImGui::GetContentRegionAvail();
         ImGui::Image((ImTextureID)(intptr_t)textureID, panelSize, ImVec2(0, 1), ImVec2(1, 0));
+
+        // Reset camera button sits on top of the scene image, top right corner
+        ImVec2 imageMin = ImGui::GetItemRectMin();
+        ImVec2 imageMax = ImGui::GetItemRectMax();
+        const char* resetLabel = "Reset Camera";
+        ImVec2 padding = ImGui::GetStyle().FramePadding;
+        float buttonWidth = ImGui::CalcTextSize(resetLabel).x + padding.x * 2.0f;
+
+        ImGui::SetCursorScreenPos(ImVec2(imageMax.x - buttonWidth - 8.0f, imageMin.y + 8.0f));
+        if (ImGui::Button(resetLabel)) {
+            camera.Reset();
+        }
     }
 
     ImGui::End();

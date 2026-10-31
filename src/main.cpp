@@ -12,10 +12,21 @@
 #include "Shader.h"
 #include "Input.h"
 #include "SceneRenderer.h"
+#include <filesystem>
+#define WIN32_LEAN_AND_MEAN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
 
 using namespace std;
 
 int main() {
+
+    // Run from the exe's folder so shaders/, fonts/ and icons_made/ are always found
+    wchar_t exePath[MAX_PATH];
+    GetModuleFileNameW(NULL, exePath, MAX_PATH);
+    std::filesystem::current_path(std::filesystem::path(exePath).parent_path());
 
     if (!glfwInit()) {
         std::cout << "GLFW failed to start.\n";
@@ -23,13 +34,14 @@ int main() {
     }
 
     GLFWwindow* sandbox_window = glfwCreateWindow(800, 600, "RunBun Sandbox", NULL, NULL);
-    glfwMaximizeWindow(sandbox_window);
 
     if (!sandbox_window) {
         std::cout << "RunBun Sandbox window failed to start\n";
         glfwTerminate();
         return -1;
     }
+
+    glfwMaximizeWindow(sandbox_window);
 
     glfwMakeContextCurrent(sandbox_window);
 
@@ -104,7 +116,7 @@ int main() {
 
         DrawMenuBar(sandbox_window, sceneRenderer);
 
-        ImVec2 scenePanelSize = DrawSceneWindow(sceneRenderer.GetTexture());
+        ImVec2 scenePanelSize = DrawSceneWindow(sceneRenderer.GetTexture(), sceneRenderer.GetCamera());
         sceneRenderer.Render(scenePanelSize);
 
         DrawObjectsWindow(sceneRenderer);

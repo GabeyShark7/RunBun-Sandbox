@@ -29,7 +29,8 @@ unsigned int LoadTexture(const std::string& path) {
         stbi_image_free(data);
     } else {
         std::cout << "Failed to load texture: " << path << "\n";
-        stbi_image_free(data);
+        glDeleteTextures(1, &textureID);
+        return 0; // 0 = no texture, callers check for this
     }
 
     return textureID;

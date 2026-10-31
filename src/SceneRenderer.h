@@ -25,6 +25,7 @@ private:
     Camera camera;
     Triangle triangle;
     std::vector<SceneObject> objects;
+    unsigned int shaderProgram = 0; // shared by every model and the triangle
 
     std::string GenerateUniqueName(const std::string& baseName);
 };

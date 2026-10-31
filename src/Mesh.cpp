@@ -35,3 +35,10 @@ void Mesh::Draw() {
     glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
 }
+
+//Frees the GPU buffers. Only call this when the mesh is being removed for good
+void Mesh::Destroy() {
+    glDeleteVertexArrays(1, &VAO);
+    glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &EBO);
+}

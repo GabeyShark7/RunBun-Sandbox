@@ -1,7 +1,6 @@
 // THIS IS ASSIMP MAGIC. BEWARE!!!
 
 #include "Model.h"
-#include "Shader.h"
 #include "Console.h"
 #include <iostream>
 #include <glad/glad.h>
@@ -16,22 +15,19 @@ glm::mat4 Model::AiMatrixToGlm(const aiMatrix4x4& from) {
     return to;
 }
 
-void Model::Load(const std::string& path) {
+bool Model::Load(const std::string& path) {
     Assimp::Importer importer;
 
     const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs);
 
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
         std::cout << "Assimp error: " << importer.GetErrorString() << "\n";
-        return;
-    }
-
-    if (!shaderLoaded) {
-        shaderProgram = LoadShader("shaders/basic.vert", "shaders/basic.frag");
-        shaderLoaded = true;
+        LogMessage(std::string("Assimp error: ") + importer.GetErrorString());
+        return false;
     }
 
     ProcessNode(scene->mRootNode, scene, glm::mat4(1.0f));
+    return true;
 }
 
 void Model::ProcessNode(aiNode* node, const aiScene* scene, glm::mat4 parentTransform) {
@@ -93,6 +89,7 @@ void Model::AddTexture(unsigned int id, const std::string& name) {
 
 void Model::RemoveTexture(int index) {
     if (index < 0 || index >= (int)textures.size()) return;
+    glDeleteTextures(1, &textures[index].id);
     textures.erase(textures.begin() + index);
 }
 
@@ -109,7 +106,15 @@ void Model::SetName(const std::string& n) {
     modelName = n;
 }
 
-void Model::Draw(glm::mat4 view, glm::mat4 projection, glm::mat4 modelMatrix) {
+void Model::Destroy() {
+    for (auto& mesh : meshes) mesh.Destroy();
+    meshes.clear();
+
+    for (auto& tex : textures) glDeleteTextures(1, &tex.id);
+    textures.clear();
+}
+
+void Model::Draw(unsigned int shaderProgram, glm::mat4 view, glm::mat4 projection, glm::mat4 modelMatrix) {
     glUseProgram(shaderProgram);
 
     int enabledCount = 0;

@@ -62,3 +62,12 @@ void Camera::ProcessMouse(float xpos, float ypos) {
     newFront.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
     front = glm::normalize(newFront);
 }
+
+void Camera::Reset() {
+    position = glm::vec3(0.0f, 0.0f, 3.0f);
+    front = glm::vec3(0.0f, 0.0f, -1.0f);
+    up = glm::vec3(0.0f, 1.0f, 0.0f);
+    yaw = -90.0f;
+    pitch = 0.0f;
+    firstMouse = true;
+}
