@@ -27,8 +27,16 @@ C++, OpenGL, GLFW, GLAD, GLM, Dear ImGui, Assimp, stb_image
 ## Mid Build w/Decent looking UI
 <img width="2335" height="1197" alt="IMG_8111" src="https://github.com/user-attachments/assets/e2fb001d-aadf-45dd-ad50-e1112736d135" />
 
-## Starting to add the ability to customize and use templates for UI (Current)
+## Starting to add the ability to customize and use templates for UI
 <img width="4032" height="3024" alt="IMG_8086" src="https://github.com/user-attachments/assets/3dbbd0f1-a08c-4efb-834f-c8faf73e8a09" />
 
+## Current Build (11/06/26)
+Two models imported, each with its own texture, and the selected one's transform shown in the Properties panel.
 
+<img width="1600" height="900" alt="RunBun Sandbox with two textured models in the scene" src="screenshots/current-main.png" />
 
+Texture tab for the selected object.
+
+<img width="1600" height="900" alt="RunBun Sandbox Texture tab" src="screenshots/current-texture.png" />
+
+*Models in these screenshots are from the [Khronos glTF Sample Assets](https://github.com/KhronosGroup/glTF-Sample-Assets) (CC0).*
