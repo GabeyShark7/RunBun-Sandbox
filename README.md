@@ -18,8 +18,18 @@ A live 3D model viewer and editor built from scratch in C++ with OpenGL. Import 
 - **09/28/26 - I plan to add the networking soon. I've been very busy but will get that done. I'm thinking Rust with rust-libp2p, but might change my mind in the next couple days.**
 - Voice and text chat between connected users
 
-## Built with
-C++, OpenGL, GLFW, GLAD, GLM, Dear ImGui, Assimp, stb_image
+## Built With
+
+| Library | Used for |
+| --- | --- |
+| C++ | The whole app |
+| [OpenGL](https://www.opengl.org/) | Rendering the scene on the GPU, with custom GLSL shaders |
+| [GLFW](https://www.glfw.org/) | Window, OpenGL context, and keyboard and mouse input |
+| [GLAD](https://github.com/Dav1dde/glad) | Loading OpenGL functions at runtime |
+| [GLM](https://github.com/g-truc/glm) | Vector and matrix math for transforms and the camera |
+| [Dear ImGui](https://github.com/ocornut/imgui) | Editor UI: Scene, Objects, Properties, and Console panels |
+| [Assimp](https://github.com/assimp/assimp) | Importing FBX, glTF, and GLB models |
+| [stb_image](https://github.com/nothings/stb) | Loading PNG and JPG textures |
 
 ## Very Early Build/UI
 <img width="644" height="324" alt="image1" src="https://github.com/user-attachments/assets/67f1d5df-5ff1-48c8-9092-c500cf45110b" />
