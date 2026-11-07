@@ -15,7 +15,7 @@ A live 3D model viewer and editor built from scratch in C++ with OpenGL. Import 
 - Basic shapes: cube, sphere, cylinder, cone, capsule, torus, pyramid, and plane
 - Infinite grid, View and Gizmos menus, and snapping in millimeters
 - Click to select, move arrows, and G / S / R keys to move, scale, and rotate
-- Tinker, Mix, and Expert modes
+- Tinker and Mix modes
 - Edit Mode with vertex, edge, and face selection (1 / 2 / 3)
 - Custom UI colors
 

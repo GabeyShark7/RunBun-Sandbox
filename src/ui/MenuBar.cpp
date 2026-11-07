@@ -11,24 +11,22 @@
 static void SetWorkMode(UISettings& settings, int mode) {
     if (settings.workMode == mode) return;
     settings.workMode = mode;
-    settings.showTransformGizmo = mode != WorkMode_Expert;
     if (mode == WorkMode_Tinker) ExitEditMode();
     ImGui::MarkIniSettingsDirty();
 }
 
 static void DrawWorkModeSwitcher(UISettings& settings) {
-    const char* names[3] = { "Tinker", "Mix", "Expert" };
-    const char* tips[3] = {
+    const char* names[2] = { "Tinker", "Mix" };
+    const char* tips[2] = {
         "Simple shapes and click-and-drag building",
         "Simple tools plus mesh editing and shortcuts",
-        "Keyboard-driven, full mesh editing",
     };
 
     ImGuiStyle& style = ImGui::GetStyle();
     ImVec2 padding = ImVec2(12.0f, 4.0f);
     float total = 0.0f;
     for (const char* name : names) total += ImGui::CalcTextSize(name).x + padding.x * 2.0f;
-    total += 4.0f * 2.0f;
+    total += 4.0f;
 
     float barHeight = ImGui::GetWindowHeight();
     float buttonHeight = ImGui::GetFontSize() + padding.y * 2.0f;
@@ -36,13 +34,13 @@ static void DrawWorkModeSwitcher(UISettings& settings) {
 
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, padding);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, style.ItemSpacing.y));
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 2; i++) {
         bool active = settings.workMode == i;
         if (active) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
         if (ImGui::Button(names[i])) SetWorkMode(settings, i);
         if (active) ImGui::PopStyleColor();
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tips[i]);
-        if (i < 2) ImGui::SameLine();
+        if (i < 1) ImGui::SameLine();
     }
     ImGui::PopStyleVar(2);
 }

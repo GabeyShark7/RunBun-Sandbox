@@ -36,7 +36,7 @@ static void SettingsReadLine(ImGuiContext*, ImGuiSettingsHandler*, void*, const 
     else if (sscanf(line, "SnapUnitMm=%f", &f) == 1) uiSettings.snapUnitMm = f > 0.0f ? f : 100.0f;
     else if (sscanf(line, "ViewFov=%f", &f) == 1) uiSettings.viewFov = f;
     else if (sscanf(line, "ShowEdit=%d", &i) == 1) uiSettings.showEdit = i != 0;
-    else if (sscanf(line, "WorkMode=%d", &i) == 1) uiSettings.workMode = (i >= 0 && i <= 2) ? i : WorkMode_Mix;
+    else if (sscanf(line, "WorkMode=%d", &i) == 1) uiSettings.workMode = (i == WorkMode_Tinker) ? i : WorkMode_Mix;
     else if (sscanf(line, "NearClipMm=%f", &f) == 1) uiSettings.nearClipMm = f;
     else if (sscanf(line, "FarClipMm=%f", &f) == 1) uiSettings.farClipMm = f;
     else if (sscanf(line, "LayoutMode=%d", &i) == 1) uiSettings.layoutMode = i;

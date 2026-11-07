@@ -3,8 +3,7 @@
 
 enum WorkMode {
     WorkMode_Tinker = 0,
-    WorkMode_Mix = 1,
-    WorkMode_Expert = 2
+    WorkMode_Mix = 1
 };
 
 enum LayoutMode {
