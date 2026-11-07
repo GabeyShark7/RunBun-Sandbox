@@ -31,6 +31,27 @@ A live 3D model viewer and editor built from scratch in C++ with OpenGL. Import 
 | [Assimp](https://github.com/assimp/assimp) | Importing FBX, glTF, and GLB models |
 | [stb_image](https://github.com/nothings/stb) | Loading PNG and JPG textures |
 
+## Project Layout
+```
+src/            Sandbox source code
+  core/         Camera, input, scene objects, UI settings
+  render/       Shaders, meshes, models, framebuffer, scene renderer
+  ui/           Editor panels, menu bar, theme, docking, dialogs
+  main.cpp
+assets/         Fonts, icons, and GLSL shaders (copied next to the exe on build)
+third_party/    Dear ImGui, GLAD, stb_image, tinyfiledialogs
+networking/     Rust P2P networking (rust-libp2p, in progress)
+build.bat       Windows build script
+```
+
+## Building (Windows)
+1. Install [MSYS2](https://www.msys2.org/) to `C:\msys64`
+2. In an MSYS2 shell, install the toolchain and libraries:
+   ```
+   pacman -S mingw-w64-x86_64-gcc mingw-w64-ucrt-x86_64-assimp mingw-w64-ucrt-x86_64-glfw mingw-w64-ucrt-x86_64-glm
+   ```
+3. Run `build.bat`. The app is built to `bin\RunBunSandbox.exe` along with its assets and DLLs.
+
 ## Very Early Build/UI
 <img width="644" height="324" alt="image1" src="https://github.com/user-attachments/assets/67f1d5df-5ff1-48c8-9092-c500cf45110b" />
 

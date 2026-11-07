@@ -4,14 +4,18 @@
 #include "imgui/imgui.h"
 #include "imgui/backends/imgui_impl_glfw.h"
 #include "imgui/backends/imgui_impl_opengl3.h"
-#include "MenuBar.h"
-#include "SceneWindow.h"
-#include "ObjectsWindow.h"
-#include "PropertiesWindow.h"
-#include "Console.h"
-#include "Shader.h"
-#include "Input.h"
-#include "SceneRenderer.h"
+#include "ui/MenuBar.h"
+#include "ui/SceneWindow.h"
+#include "ui/ObjectsWindow.h"
+#include "ui/PropertiesWindow.h"
+#include "ui/Console.h"
+#include "render/Shader.h"
+#include "core/Input.h"
+#include "render/SceneRenderer.h"
+#include "core/UISettings.h"
+#include "ui/GlassTheme.h"
+#include "ui/DockLayout.h"
+#include "ui/PreferencesWindow.h"
 #include <filesystem>
 #define WIN32_LEAN_AND_MEAN
 #ifndef NOMINMAX
@@ -60,42 +64,8 @@ int main() {
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->AddFontFromFileTTF("fonts/NunitoSans.ttf", 18.0f);
 
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.WindowRounding = 8.0f;
-    style.FrameRounding = 6.0f;
-    style.PopupRounding = 8.0f;
-    style.ScrollbarRounding = 8.0f;
-
-    ImVec4* colors = style.Colors;
-    colors[ImGuiCol_Header] = ImVec4(0.4f, 0.05f, 0.15f, 1.0f);
-    colors[ImGuiCol_HeaderHovered] = ImVec4(0.5f, 0.08f, 0.2f, 1.0f);
-    colors[ImGuiCol_HeaderActive] = ImVec4(0.6f, 0.1f, 0.25f, 1.0f);
-
-    colors[ImGuiCol_FrameBg] = ImVec4(0.25f, 0.04f, 0.1f, 1.0f);
-    colors[ImGuiCol_FrameBgHovered] = ImVec4(0.35f, 0.06f, 0.15f, 1.0f);
-    colors[ImGuiCol_FrameBgActive] = ImVec4(0.45f, 0.08f, 0.2f, 1.0f);
-
-    colors[ImGuiCol_Button] = ImVec4(0.35f, 0.05f, 0.13f, 1.0f);
-    colors[ImGuiCol_ButtonHovered] = ImVec4(0.45f, 0.08f, 0.18f, 1.0f);
-    colors[ImGuiCol_ButtonActive] = ImVec4(0.55f, 0.1f, 0.22f, 1.0f);
-
-    colors[ImGuiCol_Tab] = ImVec4(0.25f, 0.04f, 0.1f, 1.0f);
-    colors[ImGuiCol_TabHovered] = ImVec4(0.45f, 0.08f, 0.18f, 1.0f);
-    colors[ImGuiCol_TabActive] = ImVec4(0.55f, 0.1f, 0.22f, 1.0f);
-    colors[ImGuiCol_TabUnfocused] = ImVec4(0.2f, 0.03f, 0.08f, 1.0f);
-    colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.35f, 0.06f, 0.13f, 1.0f);
-
-    colors[ImGuiCol_CheckMark] = ImVec4(0.8f, 0.15f, 0.35f, 1.0f);
-    colors[ImGuiCol_SliderGrab] = ImVec4(0.6f, 0.1f, 0.25f, 1.0f);
-    colors[ImGuiCol_SliderGrabActive] = ImVec4(0.7f, 0.12f, 0.3f, 1.0f);
-
-    colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.4f, 0.06f, 0.15f, 1.0f);
-    colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.5f, 0.08f, 0.2f, 1.0f);
-    colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.6f, 0.1f, 0.25f, 1.0f);
-
-    colors[ImGuiCol_ResizeGrip] = ImVec4(0.4f, 0.06f, 0.15f, 1.0f);
-    colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.5f, 0.08f, 0.2f, 1.0f);
-    colors[ImGuiCol_ResizeGripActive] = ImVec4(0.6f, 0.1f, 0.25f, 1.0f);
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    RegisterUISettingsHandler();
 
     ImGui_ImplGlfw_InitForOpenGL(sandbox_window, true);
     ImGui_ImplOpenGL3_Init("#version 130");
@@ -114,14 +84,35 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        DrawMenuBar(sandbox_window, sceneRenderer);
+        UISettings& uiSettings = GetUISettings();
+        ApplyGlassStyle(uiSettings);
+        DrawThemeBackdrop(uiSettings);
 
-        ImVec2 scenePanelSize = DrawSceneWindow(sceneRenderer.GetTexture(), sceneRenderer.GetCamera());
+        DrawMenuBar(sandbox_window, sceneRenderer);
+        DrawMainDockSpace(uiSettings);
+
+        ImVec2 scenePanelSize = ImVec2(0, 0);
+        if (uiSettings.showScene) {
+            PreparePanel("Scene");
+            scenePanelSize = DrawSceneWindow(sceneRenderer.GetTexture(), sceneRenderer.GetCamera(), &uiSettings.showScene);
+        }
         sceneRenderer.Render(scenePanelSize);
 
-        DrawObjectsWindow(sceneRenderer);
-        DrawPropertiesWindow(sceneRenderer);
-        DrawConsoleWindow();
+        if (uiSettings.showObjects) {
+            PreparePanel("Objects");
+            DrawObjectsWindow(sceneRenderer, &uiSettings.showObjects);
+        }
+        if (uiSettings.showProperties) {
+            PreparePanel("Properties");
+            DrawPropertiesWindow(sceneRenderer, &uiSettings.showProperties);
+        }
+        if (uiSettings.showConsole) {
+            PreparePanel("Console");
+            DrawConsoleWindow(&uiSettings.showConsole);
+        }
+        FinishPanelLayout();
+
+        if (uiSettings.showPreferences) DrawPreferencesWindow(uiSettings);
 
         int windowWidth, windowHeight;
         glfwGetFramebufferSize(sandbox_window, &windowWidth, &windowHeight);

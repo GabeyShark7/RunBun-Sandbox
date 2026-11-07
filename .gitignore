@@ -15,7 +15,7 @@ obj/
 Debug/
 Release/
 .vs/
-src/imgui.ini
+imgui.ini
 Thumbs.db
 Desktop.ini
 .DS_Store
