@@ -60,15 +60,6 @@ build.bat       Windows build script
 3. Run `build.bat`. The app is built to `bin\RunBunSandbox.exe` along with its assets and DLLs.
 
 ## Current Build (11/07/26)
-Mix mode with a cube in Edit Mode and Face select.
+Mix mode with a cube in Edit Mode and Face select, using the Maroon theme.
 
 <img width="1920" height="975" alt="RunBun Sandbox in Mix mode editing a cube face" src="screenshots/current-edit-mode.png" />
-
-## Previous Build (11/06/26)
-Three grass blocks imported and textured, with the selected one's transform shown in the Properties panel.
-
-<img width="1600" height="900" alt="RunBun Sandbox with three textured grass blocks in the scene" src="screenshots/current-main.png" />
-
-Texture tab for the selected object.
-
-<img width="1600" height="900" alt="RunBun Sandbox Texture tab" src="screenshots/current-texture.png" />

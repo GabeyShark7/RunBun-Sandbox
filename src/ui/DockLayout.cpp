@@ -11,11 +11,11 @@ struct FloatingRect {
 };
 
 static const FloatingRect floatingRects[] = {
-    { "Objects",    0.015f, 0.03f, 0.180f, 0.62f },
+    { "Objects",    0.015f, 0.03f, 0.180f, 0.30f },
     { "Scene",      0.210f, 0.03f, 0.570f, 0.66f },
     { "Properties", 0.795f, 0.03f, 0.190f, 0.62f },
     { "Console",    0.210f, 0.72f, 0.570f, 0.25f },
-    { "Edit",       0.795f, 0.67f, 0.190f, 0.30f },
+    { "Edit",       0.015f, 0.36f, 0.180f, 0.61f },
 };
 
 static void ClearDockSpace(ImGuiID dockId) {
@@ -36,9 +36,9 @@ static void BuildDockedLayout(ImGuiID dockId) {
 
     ImGui::DockBuilderDockWindow("Scene", center);
     ImGui::DockBuilderDockWindow("Objects", left);
-    ImGuiID rightBottom = ImGui::DockBuilderSplitNode(right, ImGuiDir_Down, 0.40f, nullptr, &right);
+    ImGuiID leftBottom = ImGui::DockBuilderSplitNode(left, ImGuiDir_Down, 0.62f, nullptr, &left);
     ImGui::DockBuilderDockWindow("Properties", right);
-    ImGui::DockBuilderDockWindow("Edit", rightBottom);
+    ImGui::DockBuilderDockWindow("Edit", leftBottom);
     ImGui::DockBuilderDockWindow("Console", bottom);
     ImGui::DockBuilderFinish(dockId);
 }

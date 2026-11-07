@@ -125,8 +125,8 @@ int main() {
         }
         if (uiSettings.showEdit && uiSettings.workMode != WorkMode_Tinker) {
             ImGuiViewport* mainViewport = ImGui::GetMainViewport();
-            ImGui::SetNextWindowPos(ImVec2(mainViewport->WorkPos.x + mainViewport->WorkSize.x * 0.795f, mainViewport->WorkPos.y + mainViewport->WorkSize.y * 0.67f), ImGuiCond_FirstUseEver);
-            ImGui::SetNextWindowSize(ImVec2(mainViewport->WorkSize.x * 0.19f, mainViewport->WorkSize.y * 0.30f), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowPos(ImVec2(mainViewport->WorkPos.x + mainViewport->WorkSize.x * 0.015f, mainViewport->WorkPos.y + mainViewport->WorkSize.y * 0.36f), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(mainViewport->WorkSize.x * 0.18f, mainViewport->WorkSize.y * 0.61f), ImGuiCond_FirstUseEver);
             PreparePanel("Edit");
             DrawEditWindow(sceneRenderer, &uiSettings.showEdit);
         }

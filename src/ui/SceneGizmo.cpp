@@ -372,8 +372,8 @@ void DrawSceneGizmo(SceneRenderer& sceneRenderer, UISettings& settings, ImVec2 v
         snprintf(label, sizeof(label), "Edit Mode  -  %s  (1 / 2 / 3)", GetEditSelectModeName(GetEditSelectMode()));
         ImVec2 labelSize = ImGui::CalcTextSize(label);
         ImVec2 labelMin = ImVec2(viewMin.x + 12.0f, viewMin.y + 12.0f);
-        drawList->AddRectFilled(labelMin, ImVec2(labelMin.x + labelSize.x + 20.0f, labelMin.y + labelSize.y + 12.0f), IM_COL32(255, 170, 60, 220), 8.0f);
-        drawList->AddText(ImVec2(labelMin.x + 10.0f, labelMin.y + 6.0f), IM_COL32(25, 20, 15, 255), label);
+        drawList->AddRectFilled(labelMin, ImVec2(labelMin.x + labelSize.x + 20.0f, labelMin.y + labelSize.y + 12.0f), ImGui::GetColorU32(ImGuiCol_SliderGrab), 8.0f);
+        drawList->AddText(ImVec2(labelMin.x + 10.0f, labelMin.y + 6.0f), IM_COL32(255, 255, 255, 255), label);
     }
 
     if (modal.mode != Transform_None && hasSelection) {
