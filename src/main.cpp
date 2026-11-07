@@ -17,6 +17,9 @@
 #include "ui/DockLayout.h"
 #include "ui/PreferencesWindow.h"
 #include "ui/EditWindow.h"
+#include "ui/RoomWindow.h"
+#include "ui/UpdateWindow.h"
+#include "core/Updater.h"
 #include <filesystem>
 #define WIN32_LEAN_AND_MEAN
 #ifndef NOMINMAX
@@ -78,6 +81,9 @@ int main() {
     ImGui_ImplGlfw_InitForOpenGL(sandbox_window, true);
     ImGui_ImplOpenGL3_Init("#version 130");
 
+    // Dev builds skip this
+    if (GetCurrentBuild() > 0 && HasUpdateToken()) CheckForUpdates();
+
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
 
@@ -133,6 +139,10 @@ int main() {
         FinishPanelLayout();
 
         if (uiSettings.showPreferences) DrawPreferencesWindow(uiSettings);
+        UpdateRoom();
+        DrawRoomWindows();
+        DrawUpdateWindow();
+        if (UpdateWantsExit()) glfwSetWindowShouldClose(sandbox_window, GLFW_TRUE);
 
         int windowWidth, windowHeight;
         glfwGetFramebufferSize(sandbox_window, &windowWidth, &windowHeight);
@@ -146,6 +156,7 @@ int main() {
         glfwSwapBuffers(sandbox_window);
     }
 
+    ShutdownRoom();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();

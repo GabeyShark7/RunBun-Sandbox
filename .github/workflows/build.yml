@@ -1,0 +1,53 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: MINGW64
+          update: false
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-ucrt-x86_64-glfw
+            mingw-w64-ucrt-x86_64-assimp
+            mingw-w64-ucrt-x86_64-glm
+
+      - name: Rust GNU toolchain
+        run: rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal
+
+      - name: Build
+        shell: cmd
+        env:
+          MSYS_ROOT: ${{ steps.msys2.outputs.msys2-location }}
+          RUNBUN_BUILD: ${{ github.run_number }}
+          RUNBUN_UPDATE_TOKEN: ${{ secrets.RUNBUN_UPDATE_TOKEN }}
+        run: build.bat
+
+      - name: Bundle DLLs
+        shell: msys2 {0}
+        run: |
+          ldd bin/RunBunSandbox.exe | awk '$3 ~ /^\/(ucrt64|mingw64)\// {print $3}' | sort -u | while read dll; do
+            cp -n "$dll" bin/
+          done
+
+      - name: Zip
+        run: Compress-Archive -Path bin\* -DestinationPath RunBunSandbox.zip
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ github.event.head_commit.message }}
+        run: gh release create "build-${{ github.run_number }}" RunBunSandbox.zip --title "Build ${{ github.run_number }}" --notes "$env:NOTES" --latest

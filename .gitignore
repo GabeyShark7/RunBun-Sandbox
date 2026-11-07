@@ -21,3 +21,5 @@ Desktop.ini
 .DS_Store
 *.log
 *.tmp
+target/
+update_token.txt

@@ -4,6 +4,8 @@
 #include "core/UISettings.h"
 #include "imgui/imgui_internal.h"
 #include "ui/EditMode.h"
+#include "ui/RoomWindow.h"
+#include "ui/UpdateWindow.h"
 #include <iostream>
 
 // not the best, i know. Will fix later. (probably not)
@@ -15,7 +17,7 @@ static void SetWorkMode(UISettings& settings, int mode) {
     ImGui::MarkIniSettingsDirty();
 }
 
-static void DrawWorkModeSwitcher(UISettings& settings) {
+static float DrawWorkModeSwitcher(UISettings& settings) {
     const char* names[2] = { "Tinker", "Mix" };
     const char* tips[2] = {
         "Simple shapes and click-and-drag building",
@@ -30,7 +32,8 @@ static void DrawWorkModeSwitcher(UISettings& settings) {
 
     float barHeight = ImGui::GetWindowHeight();
     float buttonHeight = ImGui::GetFontSize() + padding.y * 2.0f;
-    ImGui::SetCursorPos(ImVec2(ImGui::GetWindowWidth() - total - 16.0f, (barHeight - buttonHeight) * 0.5f));
+    float left = ImGui::GetWindowWidth() - total - 16.0f;
+    ImGui::SetCursorPos(ImVec2(left, (barHeight - buttonHeight) * 0.5f));
 
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, padding);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, style.ItemSpacing.y));
@@ -43,6 +46,7 @@ static void DrawWorkModeSwitcher(UISettings& settings) {
         if (i < 1) ImGui::SameLine();
     }
     ImGui::PopStyleVar(2);
+    return left;
 }
 
 void DrawMenuBar(GLFWwindow* sandbox_window, SceneRenderer& sceneRenderer) {
@@ -88,10 +92,21 @@ void DrawMenuBar(GLFWwindow* sandbox_window, SceneRenderer& sceneRenderer) {
             if (changed) ImGui::MarkIniSettingsDirty();
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("About")) {
+        if (ImGui::BeginMenu("Room")) {
+            bool inRoom = IsInRoom();
+            if (ImGui::MenuItem("Create", nullptr, false, !inRoom)) OpenRoomCreate();
+            if (ImGui::MenuItem("Join", nullptr, false, !inRoom)) OpenRoomJoin();
+            ImGui::Separator();
+            if (ImGui::MenuItem("Show Room")) ShowRoomWindow();
+            if (ImGui::MenuItem(IsHostingRoom() ? "Close Room" : "Leave Room", nullptr, false, inRoom)) LeaveRoom();
             ImGui::EndMenu();
         }
-        DrawWorkModeSwitcher(settings);
+        if (ImGui::BeginMenu("About")) {
+            if (ImGui::MenuItem("Updates...")) ShowUpdateWindow();
+            ImGui::EndMenu();
+        }
+        float switcherLeft = DrawWorkModeSwitcher(settings);
+        DrawUpdateBadge(switcherLeft - 10.0f);
         ImGui::EndMainMenuBar();
     }
     ImGui::PopStyleVar();

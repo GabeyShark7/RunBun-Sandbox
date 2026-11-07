@@ -1,0 +1,21 @@
+[package]
+name = "runbun-net"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "runbun_net"
+crate-type = ["rlib", "staticlib"]
+
+[[bin]]
+name = "runbun-room"
+path = "src/bin/runbun-room.rs"
+
+[dependencies]
+libp2p = { version = "0.57", features = ["tokio", "tcp", "noise", "yamux", "request-response", "cbor", "macros"] }
+tokio = { version = "1", features = ["rt", "macros", "sync", "time"] }
+futures = "0.3"
+serde = { version = "1", features = ["derive"] }
+rand = "0.8"
+hmac = "0.12"
+sha2 = "0.10"
