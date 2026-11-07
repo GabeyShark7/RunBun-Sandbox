@@ -4,6 +4,8 @@
 #include <cstdint>
 
 bool DrawPanelHeader(PanelCollapseState& state) {
+    if (ImGui::IsWindowDocked()) return true;
+
     unsigned int icon = GetDropdownIcon();
     ImVec2 uv0 = state.collapsed ? ImVec2(0, 1) : ImVec2(0, 0);
     ImVec2 uv1 = state.collapsed ? ImVec2(1, 0) : ImVec2(1, 1);

@@ -7662,7 +7662,7 @@ void ImGui::RenderWindowDecorations(ImGuiWindow* window, const ImRect& title_bar
                 ImRect bg_rect(window->Pos + ImVec2(0, window->TitleBarHeight), window->Pos + window->Size);
                 ImDrawFlags bg_rounding_flags;
                 if (window->DockIsActive)
-                    bg_rounding_flags = CalcRoundingFlagsForRectInRect(bg_rect, window->DockNode->HostWindow->Rect(), 0.0f);
+                    bg_rounding_flags = (window->DockNode->IsHiddenTabBar() || window->DockNode->IsNoTabBar()) ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersBottom;
                 else
                     bg_rounding_flags = (flags & ImGuiWindowFlags_NoTitleBar) ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersBottom;
                 ImDrawList* bg_draw_list = window->DockIsActive ? window->DockNode->HostWindow->DrawList : window->DrawList;
@@ -8395,7 +8395,9 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
 
         // Lock window rounding for the frame (so that altering them doesn't cause inconsistencies)
         // Large values tend to lead to variety of artifacts and are not recommended.
-        if ((flags & ImGuiWindowFlags_ChildWindow) && !window->DockIsActive)
+        if (window->DockIsActive)
+            window->WindowRounding = style.WindowRounding;
+        else if (flags & ImGuiWindowFlags_ChildWindow)
             window->WindowRounding = style.ChildRounding;
         else if (window->RootWindowDockTree->ViewportOwned)
             window->WindowRounding = 0.0f;
@@ -18278,9 +18280,8 @@ void ImGui::DockContextEndFrame(ImGuiContext* ctx)
             if (node->LastFrameActive == g.FrameCount && node->IsVisible && node->HostWindow && node->IsLeafNode() && !node->IsBgDrawnThisFrame)
             {
                 ImRect bg_rect(node->Pos + ImVec2(0.0f, GetFrameHeight()), node->Pos + node->Size);
-                ImDrawFlags bg_rounding_flags = CalcRoundingFlagsForRectInRect(bg_rect, node->HostWindow->Rect(), g.Style.DockingSeparatorSize);
                 node->HostWindow->DrawList->ChannelsSetCurrent(DOCKING_HOST_DRAW_CHANNEL_BG);
-                node->HostWindow->DrawList->AddRectFilled(bg_rect.Min, bg_rect.Max, node->LastBgColor, node->HostWindow->WindowRounding, bg_rounding_flags);
+                node->HostWindow->DrawList->AddRectFilled(bg_rect.Min, bg_rect.Max, node->LastBgColor, g.Style.WindowRounding, ImDrawFlags_RoundCornersBottom);
             }
 }
 
@@ -19214,7 +19215,7 @@ static void ImGui::DockNodeUpdateHasCentralNodeChild(ImGuiDockNode* node)
 static void ImGui::DockNodeUpdateVisibleFlag(ImGuiDockNode* node)
 {
     // Update visibility flag
-    bool is_visible = (node->ParentNode == NULL) ? node->IsDockSpace() : node->IsCentralNode();
+    bool is_visible = (node->ParentNode == NULL) ? node->IsDockSpace() : false;
     is_visible |= (node->Windows.Size > 0);
     is_visible |= (node->ChildNodes[0] && node->ChildNodes[0]->IsVisible);
     is_visible |= (node->ChildNodes[1] && node->ChildNodes[1]->IsVisible);
@@ -19785,8 +19786,7 @@ static void ImGui::DockNodeUpdateTabBar(ImGuiDockNode* node, ImGuiWindow* host_w
     if (is_focused)
         node->LastFrameFocused = g.FrameCount;
     ImU32 title_bar_col = GetColorU32(host_window->Collapsed ? ImGuiCol_TitleBgCollapsed : is_focused ? ImGuiCol_TitleBgActive : ImGuiCol_TitleBg);
-    ImDrawFlags rounding_flags = CalcRoundingFlagsForRectInRect(title_bar_rect, host_window->Rect(), g.Style.DockingSeparatorSize);
-    host_window->DrawList->AddRectFilled(title_bar_rect.Min, title_bar_rect.Max, title_bar_col, host_window->WindowRounding, rounding_flags);
+    host_window->DrawList->AddRectFilled(title_bar_rect.Min, title_bar_rect.Max, title_bar_col, g.Style.WindowRounding, ImDrawFlags_RoundCornersTop);
 
     // Docking/Collapse button
     if (has_window_menu_button)
@@ -20109,53 +20109,36 @@ void ImGui::DockNodeCalcSplitRects(ImVec2& pos_old, ImVec2& size_old, ImVec2& po
 bool ImGui::DockNodeCalcDropRectsAndTestMousePos(const ImRect& parent, ImGuiDir dir, ImRect& out_r, bool outer_docking, ImVec2* test_mouse_pos)
 {
     ImGuiContext& g = *GImGui;
+    out_r = ImRect(+FLT_MAX, +FLT_MAX, -FLT_MAX, -FLT_MAX);
+    if (test_mouse_pos == NULL || dir == ImGuiDir_None || !parent.Contains(*test_mouse_pos))
+        return false;
 
-    const float parent_smaller_axis = ImMin(parent.GetWidth(), parent.GetHeight());
-    const float hs_for_central_nodes = ImMin(g.FontSize * 1.5f, ImMax(g.FontSize * 0.5f, parent_smaller_axis / 8.0f));
-    float hs_w; // Half-size, longer axis
-    float hs_h; // Half-size, smaller axis
-    ImVec2 off; // Distance from edge or center
+    const ImVec2 m = *test_mouse_pos;
+    const float dist[4] = { m.x - parent.Min.x, parent.Max.x - m.x, m.y - parent.Min.y, parent.Max.y - m.y };
+    float zone[4];
     if (outer_docking)
     {
-        //hs_w = ImTrunc(ImClamp(parent_smaller_axis - hs_for_central_nodes * 4.0f, g.FontSize * 0.5f, g.FontSize * 8.0f));
-        //hs_h = ImTrunc(hs_w * 0.15f);
-        //off = ImVec2(ImTrunc(parent.GetWidth() * 0.5f - GetFrameHeightWithSpacing() * 1.4f - hs_h), ImTrunc(parent.GetHeight() * 0.5f - GetFrameHeightWithSpacing() * 1.4f - hs_h));
-        hs_w = ImTrunc(hs_for_central_nodes * 1.50f);
-        hs_h = ImTrunc(hs_for_central_nodes * 0.80f);
-        off = ImTrunc(ImVec2(parent.GetWidth() * 0.5f - hs_h, parent.GetHeight() * 0.5f - hs_h));
+        const float band = ImClamp(ImMin(parent.GetWidth(), parent.GetHeight()) * 0.08f, g.FontSize * 2.0f, g.FontSize * 5.0f);
+        zone[0] = zone[1] = zone[2] = zone[3] = band;
     }
     else
     {
-        hs_w = ImTrunc(hs_for_central_nodes);
-        hs_h = ImTrunc(hs_for_central_nodes * 0.90f);
-        off = ImTrunc(ImVec2(hs_w * 2.40f, hs_w * 2.40f));
+        zone[0] = zone[1] = parent.GetWidth() * 0.30f;
+        zone[2] = zone[3] = parent.GetHeight() * 0.30f;
     }
 
-    ImVec2 c = ImTrunc(parent.GetCenter());
-    if      (dir == ImGuiDir_None)  { out_r = ImRect(c.x - hs_w, c.y - hs_w,         c.x + hs_w, c.y + hs_w);         }
-    else if (dir == ImGuiDir_Up)    { out_r = ImRect(c.x - hs_w, c.y - off.y - hs_h, c.x + hs_w, c.y - off.y + hs_h); }
-    else if (dir == ImGuiDir_Down)  { out_r = ImRect(c.x - hs_w, c.y + off.y - hs_h, c.x + hs_w, c.y + off.y + hs_h); }
-    else if (dir == ImGuiDir_Left)  { out_r = ImRect(c.x - off.x - hs_h, c.y - hs_w, c.x - off.x + hs_h, c.y + hs_w); }
-    else if (dir == ImGuiDir_Right) { out_r = ImRect(c.x + off.x - hs_h, c.y - hs_w, c.x + off.x + hs_h, c.y + hs_w); }
-
-    if (test_mouse_pos == NULL)
-        return false;
-
-    ImRect hit_r = out_r;
-    if (!outer_docking)
+    int best = -1;
+    float best_ratio = 1.0f;
+    for (int n = 0; n < 4; n++)
     {
-        // Custom hit testing for the 5-way selection, designed to reduce flickering when moving diagonally between sides
-        hit_r.Expand(ImTrunc(hs_w * 0.30f));
-        ImVec2 mouse_delta = (*test_mouse_pos - c);
-        float mouse_delta_len2 = ImLengthSqr(mouse_delta);
-        float r_threshold_center = hs_w * 1.4f;
-        float r_threshold_sides = hs_w * (1.4f + 1.2f);
-        if (mouse_delta_len2 < r_threshold_center * r_threshold_center)
-            return (dir == ImGuiDir_None);
-        if (mouse_delta_len2 < r_threshold_sides * r_threshold_sides)
-            return (dir == ImGetDirQuadrantFromDelta(mouse_delta.x, mouse_delta.y));
+        const float ratio = dist[n] / ImMax(zone[n], 1.0f);
+        if (ratio < best_ratio)
+        {
+            best_ratio = ratio;
+            best = n;
+        }
     }
-    return hit_r.Contains(*test_mouse_pos);
+    return best == (int)dir;
 }
 
 // host_node may be NULL if the window doesn't have a DockNode already.
@@ -20225,6 +20208,16 @@ static void ImGui::DockNodePreviewDockSetup(ImGuiWindow* host_window, ImGuiDockN
             }
         }
 
+    if (!is_outer_docking && !host_window->Collapsed && data->IsCenterAvailable && data->FutureNode.Rect().Contains(g.IO.MousePos))
+    {
+        const bool fill_empty_space = host_node != NULL && host_node->IsEmpty();
+        if (fill_empty_space || !data->IsSplitDirExplicit)
+        {
+            data->SplitDir = ImGuiDir_None;
+            data->IsSplitDirExplicit = true;
+        }
+    }
+
     // When docking without holding Shift, we only allow and preview docking when hovering over a drop rect or over the title bar
     data->IsDropAllowed = (data->SplitDir != ImGuiDir_None) || (data->IsCenterAvailable);
     if (!is_explicit_target && !data->IsSplitDirExplicit && !g.IO.ConfigDockingWithShift)
@@ -20279,7 +20272,13 @@ static void ImGui::DockNodePreviewDockRender(ImGuiWindow* host_window, ImGuiDock
             overlay_rect.Min.y += GetFrameHeight();
         if (data->SplitDir != ImGuiDir_None || data->IsCenterAvailable)
             for (int overlay_n = 0; overlay_n < overlay_draw_lists_count; overlay_n++)
-                overlay_draw_lists[overlay_n]->AddRectFilled(overlay_rect.Min, overlay_rect.Max, overlay_col_main, host_window->WindowRounding, CalcRoundingFlagsForRectInRect(overlay_rect, host_window->Rect(), g.Style.DockingSeparatorSize));
+            {
+                ImRect preview_rect = overlay_rect;
+                preview_rect.Expand(-ImMax(2.0f, g.Style.DockingSeparatorSize * 0.5f));
+                const float preview_rounding = ImMax(g.Style.WindowRounding, g.Style.FrameRounding);
+                overlay_draw_lists[overlay_n]->AddRectFilled(preview_rect.Min, preview_rect.Max, overlay_col_main, preview_rounding, ImDrawFlags_RoundCornersAll);
+                overlay_draw_lists[overlay_n]->AddRect(preview_rect.Min, preview_rect.Max, overlay_col_drop_hovered, preview_rounding, ImDrawFlags_RoundCornersAll, 2.0f);
+            }
     }
 
     // Display tab shape/label preview unless we are splitting node (it generally makes the situation harder to read)
@@ -20653,7 +20652,7 @@ void ImGui::DockNodeTreeUpdateSplitter(ImGuiDockNode* node)
             float cur_size_1 = child_1->Size[axis];
             float min_size_0 = resize_limits[0] - child_0->Pos[axis];
             float min_size_1 = child_1->Pos[axis] + child_1->Size[axis] - resize_limits[1];
-            ImU32 bg_col = GetColorU32(ImGuiCol_WindowBg);
+            ImU32 bg_col = 0;
             if (SplitterBehavior(bb, GetID("##Splitter"), axis, &cur_size_0, &cur_size_1, min_size_0, min_size_1, g.WindowsBorderHoverPadding, WINDOWS_RESIZE_FROM_EDGES_FEEDBACK_TIMER, bg_col))
             {
                 if (touching_nodes[0].Size > 0 && touching_nodes[1].Size > 0)

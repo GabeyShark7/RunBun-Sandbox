@@ -16,6 +16,7 @@
 #include "ui/GlassTheme.h"
 #include "ui/DockLayout.h"
 #include "ui/PreferencesWindow.h"
+#include "ui/EditWindow.h"
 #include <filesystem>
 #define WIN32_LEAN_AND_MEAN
 #ifndef NOMINMAX
@@ -62,7 +63,14 @@ int main() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
-    io.Fonts->AddFontFromFileTTF("fonts/NunitoSans.ttf", 18.0f);
+    ImFontConfig fontConfig;
+    fontConfig.OversampleH = 3;
+    fontConfig.OversampleV = 2;
+    fontConfig.PixelSnapH = true;
+    io.Fonts->AddFontFromFileTTF("fonts/NunitoSans-Bold.ttf", 18.0f, &fontConfig);
+    float contentScaleX = 1.0f, contentScaleY = 1.0f;
+    glfwGetWindowContentScale(sandbox_window, &contentScaleX, &contentScaleY);
+    ImGui::GetStyle().FontScaleDpi = contentScaleX;
 
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     RegisterUISettingsHandler();
@@ -94,8 +102,13 @@ int main() {
         ImVec2 scenePanelSize = ImVec2(0, 0);
         if (uiSettings.showScene) {
             PreparePanel("Scene");
-            scenePanelSize = DrawSceneWindow(sceneRenderer.GetTexture(), sceneRenderer.GetCamera(), &uiSettings.showScene);
+            scenePanelSize = DrawSceneWindow(sceneRenderer, uiSettings, &uiSettings.showScene);
         }
+        sceneRenderer.showGrid = uiSettings.showGrid;
+        Camera& viewCamera = sceneRenderer.GetCamera();
+        viewCamera.fov = uiSettings.viewFov;
+        viewCamera.nearPlane = uiSettings.nearClipMm / 1000.0f;
+        viewCamera.farPlane = uiSettings.farClipMm / 1000.0f;
         sceneRenderer.Render(scenePanelSize);
 
         if (uiSettings.showObjects) {
@@ -109,6 +122,13 @@ int main() {
         if (uiSettings.showConsole) {
             PreparePanel("Console");
             DrawConsoleWindow(&uiSettings.showConsole);
+        }
+        if (uiSettings.showEdit && uiSettings.workMode != WorkMode_Tinker) {
+            ImGuiViewport* mainViewport = ImGui::GetMainViewport();
+            ImGui::SetNextWindowPos(ImVec2(mainViewport->WorkPos.x + mainViewport->WorkSize.x * 0.795f, mainViewport->WorkPos.y + mainViewport->WorkSize.y * 0.67f), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(mainViewport->WorkSize.x * 0.19f, mainViewport->WorkSize.y * 0.30f), ImGuiCond_FirstUseEver);
+            PreparePanel("Edit");
+            DrawEditWindow(sceneRenderer, &uiSettings.showEdit);
         }
         FinishPanelLayout();
 

@@ -3,9 +3,49 @@
 #include "ui/FileDialog.h"
 #include "core/UISettings.h"
 #include "imgui/imgui_internal.h"
+#include "ui/EditMode.h"
 #include <iostream>
 
 // not the best, i know. Will fix later. (probably not)
+
+static void SetWorkMode(UISettings& settings, int mode) {
+    if (settings.workMode == mode) return;
+    settings.workMode = mode;
+    settings.showTransformGizmo = mode != WorkMode_Expert;
+    if (mode == WorkMode_Tinker) ExitEditMode();
+    ImGui::MarkIniSettingsDirty();
+}
+
+static void DrawWorkModeSwitcher(UISettings& settings) {
+    const char* names[3] = { "Tinker", "Mix", "Expert" };
+    const char* tips[3] = {
+        "Simple shapes and click-and-drag building",
+        "Simple tools plus mesh editing and shortcuts",
+        "Keyboard-driven, full mesh editing",
+    };
+
+    ImGuiStyle& style = ImGui::GetStyle();
+    ImVec2 padding = ImVec2(12.0f, 4.0f);
+    float total = 0.0f;
+    for (const char* name : names) total += ImGui::CalcTextSize(name).x + padding.x * 2.0f;
+    total += 4.0f * 2.0f;
+
+    float barHeight = ImGui::GetWindowHeight();
+    float buttonHeight = ImGui::GetFontSize() + padding.y * 2.0f;
+    ImGui::SetCursorPos(ImVec2(ImGui::GetWindowWidth() - total - 16.0f, (barHeight - buttonHeight) * 0.5f));
+
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, padding);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, style.ItemSpacing.y));
+    for (int i = 0; i < 3; i++) {
+        bool active = settings.workMode == i;
+        if (active) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+        if (ImGui::Button(names[i])) SetWorkMode(settings, i);
+        if (active) ImGui::PopStyleColor();
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tips[i]);
+        if (i < 2) ImGui::SameLine();
+    }
+    ImGui::PopStyleVar(2);
+}
 
 void DrawMenuBar(GLFWwindow* sandbox_window, SceneRenderer& sceneRenderer) {
     UISettings& settings = GetUISettings();
@@ -27,15 +67,18 @@ void DrawMenuBar(GLFWwindow* sandbox_window, SceneRenderer& sceneRenderer) {
             changed |= ImGui::MenuItem("Objects", nullptr, &settings.showObjects);
             changed |= ImGui::MenuItem("Properties", nullptr, &settings.showProperties);
             changed |= ImGui::MenuItem("Console", nullptr, &settings.showConsole);
+            changed |= ImGui::MenuItem("Edit", nullptr, &settings.showEdit, settings.workMode != WorkMode_Tinker);
+            ImGui::Separator();
+            changed |= ImGui::MenuItem("Grid", nullptr, &settings.showGrid);
             ImGui::Separator();
             if (ImGui::MenuItem("Float All Panels")) {
-                settings.showScene = settings.showObjects = settings.showProperties = settings.showConsole = true;
+                settings.showScene = settings.showObjects = settings.showProperties = settings.showConsole = settings.showEdit = true;
                 settings.layoutMode = LayoutMode_Floating;
                 settings.resetLayout = true;
                 changed = true;
             }
             if (ImGui::MenuItem("Dock All Panels")) {
-                settings.showScene = settings.showObjects = settings.showProperties = settings.showConsole = true;
+                settings.showScene = settings.showObjects = settings.showProperties = settings.showConsole = settings.showEdit = true;
                 settings.layoutMode = LayoutMode_Docked;
                 settings.resetLayout = true;
                 changed = true;
@@ -50,6 +93,7 @@ void DrawMenuBar(GLFWwindow* sandbox_window, SceneRenderer& sceneRenderer) {
         if (ImGui::BeginMenu("About")) {
             ImGui::EndMenu();
         }
+        DrawWorkModeSwitcher(settings);
         ImGui::EndMainMenuBar();
     }
     ImGui::PopStyleVar();

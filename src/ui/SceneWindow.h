@@ -1,6 +1,7 @@
 #pragma once
 #include "imgui/imgui.h"
-#include "core/Camera.h"
+class SceneRenderer;
+struct UISettings;
 
-ImVec2 DrawSceneWindow(unsigned int textureID, Camera& camera, bool* open);
+ImVec2 DrawSceneWindow(SceneRenderer& sceneRenderer, UISettings& settings, bool* open);
 bool IsSceneHovered();

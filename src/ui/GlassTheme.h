@@ -6,3 +6,4 @@ void DrawThemeBackdrop(const UISettings& settings);
 const char* GetThemeName(int index);
 int GetThemeCount();
 ImVec4 GetThemeAccent(int index);
+void CopyThemeColorsToCustom(UISettings& settings);

@@ -2,6 +2,9 @@
 
 void Mesh::Init(std::vector<Vertex> vertices, std::vector<unsigned int> indices) {
     indexCount = (int)indices.size();
+    cpuVertices = vertices;
+    cpuIndices = indices;
+    UpdateBounds();
 
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
@@ -28,6 +31,24 @@ void Mesh::Init(std::vector<Vertex> vertices, std::vector<unsigned int> indices)
     glEnableVertexAttribArray(2);
 
     glBindVertexArray(0);
+}
+
+void Mesh::UpdateBounds() {
+    if (cpuVertices.empty()) return;
+    boundsMin = boundsMax = cpuVertices[0].position;
+    for (const Vertex& v : cpuVertices) {
+        boundsMin = glm::min(boundsMin, v.position);
+        boundsMax = glm::max(boundsMax, v.position);
+    }
+}
+
+void Mesh::UpdateVertices(const std::vector<Vertex>& vertices) {
+    if (vertices.size() != cpuVertices.size()) return;
+    cpuVertices = vertices;
+    UpdateBounds();
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(Vertex), vertices.data());
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void Mesh::Draw() {

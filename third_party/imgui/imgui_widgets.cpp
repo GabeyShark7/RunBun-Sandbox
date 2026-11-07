@@ -1860,8 +1860,18 @@ bool ImGui::SplitterBehavior(const ImRect& bb, ImGuiID id, ImGuiAxis axis, float
     // Render at new position
     if (bg_col & IM_COL32_A_MASK)
         window->DrawList->AddRectFilled(bb_render.Min, bb_render.Max, bg_col, 0.0f);
-    const ImU32 col = GetColorU32(held ? ImGuiCol_SeparatorActive : (hovered && g.HoveredIdTimer >= hover_visibility_delay) ? ImGuiCol_SeparatorHovered : ImGuiCol_Separator);
-    window->DrawList->AddRectFilled(bb_render.Min, bb_render.Max, col, 0.0f);
+    const bool show_hover = hovered && g.HoveredIdTimer >= hover_visibility_delay;
+    if (held || show_hover)
+    {
+        ImRect bar = bb_render;
+        const float thin = ImMax(2.0f, ImMin(bar.GetWidth(), bar.GetHeight()) * 0.4f);
+        const ImVec2 center = bar.GetCenter();
+        if (axis == ImGuiAxis_X)
+            bar = ImRect(center.x - thin * 0.5f, bar.Min.y, center.x + thin * 0.5f, bar.Max.y);
+        else
+            bar = ImRect(bar.Min.x, center.y - thin * 0.5f, bar.Max.x, center.y + thin * 0.5f);
+        window->DrawList->AddRectFilled(bar.Min, bar.Max, GetColorU32(held ? ImGuiCol_SeparatorActive : ImGuiCol_SeparatorHovered), thin * 0.5f);
+    }
 
     return held;
 }

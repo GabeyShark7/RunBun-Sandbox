@@ -1,4 +1,5 @@
 #include "ui/GlassTheme.h"
+#include <cfloat>
 
 struct ThemePreset {
     const char* name;
@@ -55,6 +56,28 @@ ImVec4 GetThemeAccent(int index) {
     return GetTheme(index).accent;
 }
 
+void CopyThemeColorsToCustom(UISettings& settings) {
+    const ThemePreset& theme = GetTheme(settings.themePreset);
+    settings.customBackdrop = theme.backdrop;
+    settings.customPanel = theme.glassTint;
+    settings.customText = theme.text;
+    settings.customBorder = theme.border;
+}
+
+static ThemePreset ResolveTheme(const UISettings& settings) {
+    ThemePreset theme = GetTheme(settings.themePreset);
+    if (!settings.useCustomColors) return theme;
+
+    theme.backdrop = settings.customBackdrop;
+    theme.glassTint = settings.customPanel;
+    theme.text = settings.customText;
+    theme.border = settings.customBorder;
+    theme.overlay = ImVec4(settings.customText.x, settings.customText.y, settings.customText.z, 1.0f);
+    ImVec4 panel = settings.customPanel;
+    theme.popupBg = ImVec4(panel.x * 0.85f, panel.y * 0.85f, panel.z * 0.85f, 0.98f);
+    return theme;
+}
+
 static ImVec4 WithAlpha(const ImVec4& color, float alpha) {
     return ImVec4(color.x, color.y, color.z, alpha);
 }
@@ -68,9 +91,9 @@ static float Clamp01(float value) {
 }
 
 void ApplyGlassStyle(const UISettings& settings) {
-    const ThemePreset& theme = GetTheme(settings.themePreset);
+    const ThemePreset theme = ResolveTheme(settings);
     ImGuiStyle& style = ImGui::GetStyle();
-    float r = settings.roundness;
+    float r = settings.roundness < 4.0f ? 4.0f : settings.roundness;
     float glass = Clamp01(settings.glassOpacity + theme.glassBoost);
     ImVec4 accent = settings.accent;
     ImVec4 accentSoft = Mix(accent, theme.text, 0.25f);
@@ -85,6 +108,10 @@ void ApplyGlassStyle(const UISettings& settings) {
     style.GrabRounding = r;
     style.ScrollbarRounding = r;
     style.TabRounding = r * 0.6f;
+    style.TabBarBorderSize = 0.0f;
+    style.TabBarOverlineSize = 0.0f;
+    style.TabCloseButtonMinWidthSelected = FLT_MAX;
+    style.TabCloseButtonMinWidthUnselected = FLT_MAX;
 
     style.WindowBorderSize = 1.0f;
     style.ChildBorderSize = 1.0f;
@@ -100,7 +127,7 @@ void ApplyGlassStyle(const UISettings& settings) {
     style.GrabMinSize = 12.0f;
     style.WindowMinSize = ImVec2(160.0f, 90.0f);
     style.WindowBorderHoverPadding = 8.0f;
-    style.DockingSeparatorSize = 4.0f;
+    style.DockingSeparatorSize = 10.0f;
     style.WindowMenuButtonPosition = ImGuiDir_None;
 
     ImVec4* colors = style.Colors;
@@ -146,13 +173,13 @@ void ApplyGlassStyle(const UISettings& settings) {
     colors[ImGuiCol_ResizeGripHovered] = WithAlpha(accent, 0.60f);
     colors[ImGuiCol_ResizeGripActive] = accent;
 
-    colors[ImGuiCol_Tab] = WithAlpha(overlay, 0.05f);
-    colors[ImGuiCol_TabHovered] = WithAlpha(overlay, 0.16f);
-    colors[ImGuiCol_TabSelected] = WithAlpha(overlay, 0.12f);
-    colors[ImGuiCol_TabSelectedOverline] = accent;
-    colors[ImGuiCol_TabDimmed] = WithAlpha(overlay, 0.03f);
-    colors[ImGuiCol_TabDimmedSelected] = WithAlpha(overlay, 0.08f);
-    colors[ImGuiCol_TabDimmedSelectedOverline] = WithAlpha(accent, 0.5f);
+    colors[ImGuiCol_Tab] = WithAlpha(overlay, 0.0f);
+    colors[ImGuiCol_TabHovered] = WithAlpha(overlay, 0.10f);
+    colors[ImGuiCol_TabSelected] = WithAlpha(overlay, 0.08f);
+    colors[ImGuiCol_TabSelectedOverline] = WithAlpha(accent, 0.0f);
+    colors[ImGuiCol_TabDimmed] = WithAlpha(overlay, 0.0f);
+    colors[ImGuiCol_TabDimmedSelected] = WithAlpha(overlay, 0.05f);
+    colors[ImGuiCol_TabDimmedSelectedOverline] = WithAlpha(accent, 0.0f);
 
     colors[ImGuiCol_DockingPreview] = WithAlpha(accent, 0.55f);
     colors[ImGuiCol_DockingEmptyBg] = WithAlpha(overlay, 0.0f);
@@ -164,7 +191,7 @@ void ApplyGlassStyle(const UISettings& settings) {
 }
 
 void DrawThemeBackdrop(const UISettings& settings) {
-    const ThemePreset& theme = GetTheme(settings.themePreset);
+    const ThemePreset theme = ResolveTheme(settings);
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImVec2 max = ImVec2(viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y);
     ImGui::GetBackgroundDrawList(viewport)->AddRectFilled(viewport->Pos, max, ImGui::ColorConvertFloat4ToU32(theme.backdrop));

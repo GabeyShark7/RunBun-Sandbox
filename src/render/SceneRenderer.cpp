@@ -1,15 +1,52 @@
 #include "render/SceneRenderer.h"
 #include "render/TextureLoader.h"
 #include "render/Shader.h"
+#include "render/Primitives.h"
 #include "ui/Console.h"
 #include <glad/glad.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <algorithm>
+#include <cfloat>
+#include <cmath>
 
 void SceneRenderer::Init() {
     glEnable(GL_DEPTH_TEST);
     framebuffer.Init(800, 600);
     shaderProgram = LoadShader("shaders/basic.vert", "shaders/basic.frag");
     triangle.Init(shaderProgram);
+    InitGrid();
+}
+
+void SceneRenderer::InitGrid() {
+    gridProgram = LoadShader("shaders/grid.vert", "shaders/grid.frag");
+    const float quad[] = { -1, 0, -1,   1, 0, -1,   1, 0, 1,   -1, 0, -1,   1, 0, 1,   -1, 0, 1 };
+
+    glGenVertexArrays(1, &gridVAO);
+    glGenBuffers(1, &gridVBO);
+    glBindVertexArray(gridVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, gridVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0);
+}
+
+void SceneRenderer::DrawGrid(const glm::mat4& view, const glm::mat4& projection) {
+    glUseProgram(gridProgram);
+    glUniformMatrix4fv(glGetUniformLocation(gridProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(gridProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+    glUniform3fv(glGetUniformLocation(gridProgram, "cameraPos"), 1, glm::value_ptr(camera.position));
+    glUniform1f(glGetUniformLocation(gridProgram, "extent"), camera.farPlane * 0.9f);
+
+    glEnable(GL_BLEND);
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
+    glBindVertexArray(gridVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
 }
 
 void SceneRenderer::Render(ImVec2 panelSize) {
@@ -32,16 +69,11 @@ void SceneRenderer::Render(ImVec2 panelSize) {
         triangle.Draw(view, projection);
     } else {
         for (auto& obj : objects) {
-            glm::mat4 modelMatrix = glm::mat4(1.0f);
-            modelMatrix = glm::translate(modelMatrix, obj.position);
-            modelMatrix = glm::rotate(modelMatrix, glm::radians(obj.rotation.x), glm::vec3(1, 0, 0));
-            modelMatrix = glm::rotate(modelMatrix, glm::radians(obj.rotation.y), glm::vec3(0, 1, 0));
-            modelMatrix = glm::rotate(modelMatrix, glm::radians(obj.rotation.z), glm::vec3(0, 0, 1));
-            modelMatrix = glm::scale(modelMatrix, obj.scale);
-
-            obj.model.Draw(shaderProgram, view, projection, modelMatrix);
+            obj.model.Draw(shaderProgram, view, projection, obj.GetModelMatrix());
         }
     }
+
+    if (showGrid) DrawGrid(view, projection);
 
     framebuffer.Unbind();
 }
@@ -94,6 +126,65 @@ void SceneRenderer::LoadModel(const std::string& path) {
 
     objects.push_back(std::move(obj));
     selectedIndex = (int)objects.size() - 1;
+}
+
+void SceneRenderer::CreatePrimitive(PrimitiveType type) {
+    SceneObject obj;
+    obj.model.AddMesh(CreatePrimitiveMesh(type));
+    obj.name = GenerateUniqueName(GetPrimitiveName(type));
+    obj.model.SetName(obj.name);
+    obj.scale = glm::vec3(1.0f);
+
+    glm::vec3 boundsMin, boundsMax;
+    obj.model.GetBounds(boundsMin, boundsMax);
+    obj.position = camera.position + camera.front * 5.0f;
+    obj.position.y = -boundsMin.y;
+
+    objects.push_back(std::move(obj));
+    selectedIndex = (int)objects.size() - 1;
+    LogMessage("Created '" + objects.back().name + "'.");
+}
+
+int SceneRenderer::PickObject(const glm::vec3& rayOrigin, const glm::vec3& rayDir) {
+    int best = -1;
+    float bestT = FLT_MAX;
+
+    for (int i = 0; i < (int)objects.size(); i++) {
+        glm::vec3 boundsMin, boundsMax;
+        if (!objects[i].model.GetBounds(boundsMin, boundsMax)) continue;
+
+        glm::vec3 pad = glm::max((boundsMax - boundsMin) * 0.01f, glm::vec3(0.001f));
+        boundsMin -= pad;
+        boundsMax += pad;
+
+        glm::mat4 inverseModel = glm::inverse(objects[i].GetModelMatrix());
+        glm::vec3 origin = glm::vec3(inverseModel * glm::vec4(rayOrigin, 1.0f));
+        glm::vec3 dir = glm::vec3(inverseModel * glm::vec4(rayDir, 0.0f));
+
+        float tMin = -FLT_MAX, tMax = FLT_MAX;
+        bool hit = true;
+        for (int axis = 0; axis < 3 && hit; axis++) {
+            if (std::fabs(dir[axis]) < 1e-8f) {
+                if (origin[axis] < boundsMin[axis] || origin[axis] > boundsMax[axis]) hit = false;
+                continue;
+            }
+            float t1 = (boundsMin[axis] - origin[axis]) / dir[axis];
+            float t2 = (boundsMax[axis] - origin[axis]) / dir[axis];
+            if (t1 > t2) std::swap(t1, t2);
+            tMin = std::max(tMin, t1);
+            tMax = std::min(tMax, t2);
+            if (tMin > tMax) hit = false;
+        }
+        if (!hit || tMax < 0.0f) continue;
+
+        float t = tMin > 0.0f ? tMin : tMax;
+        if (t < bestT) {
+            bestT = t;
+            best = i;
+        }
+    }
+
+    return best;
 }
 
 void SceneRenderer::LoadTextureForSelected(const std::string& path) {

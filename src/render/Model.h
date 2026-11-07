@@ -24,6 +24,9 @@ public:
     std::vector<TextureInfo>& GetTextures();
 
     void SetName(const std::string& n);
+    void AddMesh(const Mesh& mesh);
+    bool GetBounds(glm::vec3& outMin, glm::vec3& outMax) const;
+    std::vector<Mesh>& GetMeshes() { return meshes; }
     void Destroy(); // frees all meshes and textures on the GPU
 
 private:

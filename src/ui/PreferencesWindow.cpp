@@ -10,6 +10,7 @@ static bool DrawPanelsTab(UISettings& settings) {
     changed |= ImGui::Checkbox("Objects", &settings.showObjects);
     changed |= ImGui::Checkbox("Properties", &settings.showProperties);
     changed |= ImGui::Checkbox("Console", &settings.showConsole);
+    changed |= ImGui::Checkbox("Edit", &settings.showEdit);
 
     ImGui::Spacing();
     ImGui::Separator();
@@ -24,12 +25,12 @@ static bool DrawPanelsTab(UISettings& settings) {
     ImGui::Spacing();
 
     if (ImGui::Button("Show All")) {
-        settings.showScene = settings.showObjects = settings.showProperties = settings.showConsole = true;
+        settings.showScene = settings.showObjects = settings.showProperties = settings.showConsole = settings.showEdit = true;
         changed = true;
     }
     ImGui::SameLine();
     if (ImGui::Button("Reset Layout")) {
-        settings.showScene = settings.showObjects = settings.showProperties = settings.showConsole = true;
+        settings.showScene = settings.showObjects = settings.showProperties = settings.showConsole = settings.showEdit = true;
         settings.resetLayout = true;
         changed = true;
     }
@@ -47,6 +48,7 @@ static bool DrawAppearanceTab(UISettings& settings) {
             if (ImGui::Selectable(GetThemeName(i), selected)) {
                 settings.themePreset = i;
                 settings.accent = GetThemeAccent(i);
+                CopyThemeColorsToCustom(settings);
                 changed = true;
             }
             if (selected) ImGui::SetItemDefaultFocus();
@@ -57,12 +59,30 @@ static bool DrawAppearanceTab(UISettings& settings) {
     ImGui::Spacing();
     ImGui::TextDisabled("Glass");
     changed |= ImGui::SliderFloat("Opacity", &settings.glassOpacity, 0.30f, 1.0f, "%.2f");
-    changed |= ImGui::SliderFloat("Roundness", &settings.roundness, 0.0f, 24.0f, "%.0f px");
+    changed |= ImGui::SliderFloat("Roundness", &settings.roundness, 4.0f, 24.0f, "%.0f px");
 
     ImGui::Spacing();
     ImGui::TextDisabled("Interface");
     changed |= ImGui::SliderFloat("UI Scale", &settings.uiScale, 0.8f, 1.5f, "%.2fx");
     changed |= ImGui::ColorEdit3("Accent", &settings.accent.x, ImGuiColorEditFlags_NoInputs);
+
+    ImGui::Spacing();
+    ImGui::TextDisabled("Colors");
+    if (ImGui::Checkbox("Use my own colors", &settings.useCustomColors)) {
+        if (settings.useCustomColors) CopyThemeColorsToCustom(settings);
+        changed = true;
+    }
+    ImGui::BeginDisabled(!settings.useCustomColors);
+    ImGuiColorEditFlags colorFlags = ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_PickerHueWheel;
+    changed |= ImGui::ColorEdit3("Background", &settings.customBackdrop.x, colorFlags);
+    changed |= ImGui::ColorEdit3("Panels", &settings.customPanel.x, colorFlags);
+    changed |= ImGui::ColorEdit3("Text", &settings.customText.x, colorFlags);
+    changed |= ImGui::ColorEdit4("Borders", &settings.customBorder.x, colorFlags);
+    if (ImGui::Button("Start From Current Theme")) {
+        CopyThemeColorsToCustom(settings);
+        changed = true;
+    }
+    ImGui::EndDisabled();
 
     ImGui::Spacing();
     ImGui::Separator();

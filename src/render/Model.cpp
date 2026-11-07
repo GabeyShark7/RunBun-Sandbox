@@ -106,6 +106,21 @@ void Model::SetName(const std::string& n) {
     modelName = n;
 }
 
+void Model::AddMesh(const Mesh& mesh) {
+    meshes.push_back(mesh);
+}
+
+bool Model::GetBounds(glm::vec3& outMin, glm::vec3& outMax) const {
+    if (meshes.empty()) return false;
+    outMin = meshes[0].boundsMin;
+    outMax = meshes[0].boundsMax;
+    for (const Mesh& mesh : meshes) {
+        outMin = glm::min(outMin, mesh.boundsMin);
+        outMax = glm::max(outMax, mesh.boundsMax);
+    }
+    return true;
+}
+
 void Model::Destroy() {
     for (auto& mesh : meshes) mesh.Destroy();
     meshes.clear();

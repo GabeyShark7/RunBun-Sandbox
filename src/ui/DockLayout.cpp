@@ -15,6 +15,7 @@ static const FloatingRect floatingRects[] = {
     { "Scene",      0.210f, 0.03f, 0.570f, 0.66f },
     { "Properties", 0.795f, 0.03f, 0.190f, 0.62f },
     { "Console",    0.210f, 0.72f, 0.570f, 0.25f },
+    { "Edit",       0.795f, 0.67f, 0.190f, 0.30f },
 };
 
 static void ClearDockSpace(ImGuiID dockId) {
@@ -35,7 +36,9 @@ static void BuildDockedLayout(ImGuiID dockId) {
 
     ImGui::DockBuilderDockWindow("Scene", center);
     ImGui::DockBuilderDockWindow("Objects", left);
+    ImGuiID rightBottom = ImGui::DockBuilderSplitNode(right, ImGuiDir_Down, 0.40f, nullptr, &right);
     ImGui::DockBuilderDockWindow("Properties", right);
+    ImGui::DockBuilderDockWindow("Edit", rightBottom);
     ImGui::DockBuilderDockWindow("Console", bottom);
     ImGui::DockBuilderFinish(dockId);
 }
@@ -61,7 +64,23 @@ void DrawMainDockSpace(UISettings& settings) {
         ImGui::MarkIniSettingsDirty();
     }
 
-    ImGui::DockSpaceOverViewport(dockId, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->WorkPos);
+    ImGui::SetNextWindowSize(viewport->WorkSize);
+    ImGui::SetNextWindowViewport(viewport->ID);
+
+    ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoBringToFrontOnFocus |
+        ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
+
+    float gap = ImGui::GetStyle().DockingSeparatorSize;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(gap, gap));
+    ImGui::Begin("RunBunDockHost", nullptr, hostFlags);
+    ImGui::PopStyleVar(3);
+    ImGui::DockSpace(dockId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+    ImGui::End();
 }
 
 void PreparePanel(const char* name) {

@@ -6,14 +6,10 @@ glm::mat4 Camera::GetViewMatrix() {
 }
 
 glm::mat4 Camera::GetProjectionMatrix(int width, int height) {
-    float nearPlane = 1.0f;
-    float farPlane = 1000.0f;
-    float unitsPerPixel = 0.0015f;
-
-    float halfWidth = (width / 2.0f) * unitsPerPixel;
-    float halfHeight = (height / 2.0f) * unitsPerPixel;
-
-    return glm::frustum(-halfWidth, halfWidth, -halfHeight, halfHeight, nearPlane, farPlane);
+    float aspect = height > 0 ? (float)width / (float)height : 1.0f;
+    float nearClip = nearPlane > 0.0001f ? nearPlane : 0.0001f;
+    float farClip = farPlane > nearClip * 1.01f ? farPlane : nearClip * 1.01f;
+    return glm::perspective(glm::radians(fov), aspect, nearClip, farClip);
 }
 
 void Camera::ProcessKeyboard(GLFWwindow* window, float deltaTime) {
@@ -64,10 +60,10 @@ void Camera::ProcessMouse(float xpos, float ypos) {
 }
 
 void Camera::Reset() {
-    position = glm::vec3(0.0f, 0.0f, 3.0f);
-    front = glm::vec3(0.0f, 0.0f, -1.0f);
+    position = glm::vec3(0.0f, 1.5f, 4.0f);
+    front = glm::vec3(0.0f, -0.342f, -0.940f);
     up = glm::vec3(0.0f, 1.0f, 0.0f);
     yaw = -90.0f;
-    pitch = 0.0f;
+    pitch = -20.0f;
     firstMouse = true;
 }

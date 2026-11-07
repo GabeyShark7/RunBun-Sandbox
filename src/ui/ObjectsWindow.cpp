@@ -1,6 +1,7 @@
 #include "ui/ObjectsWindow.h"
 #include "imgui/imgui.h"
 #include "ui/PanelHeader.h"
+#include "ui/CreateMenu.h"
 
 static PanelCollapseState collapseState;
 
@@ -14,7 +15,7 @@ void DrawObjectsWindow(SceneRenderer& sceneRenderer, bool* open) {
         auto& objects = sceneRenderer.GetObjects();
 
         if (objects.empty()) {
-            ImGui::Text("No objects imported");
+            ImGui::TextDisabled("No objects yet. Right-click to create one.");
         } else {
             int deleteIndex = -1;
 
@@ -38,6 +39,11 @@ void DrawObjectsWindow(SceneRenderer& sceneRenderer, bool* open) {
                 sceneRenderer.RemoveObject(deleteIndex);
             }
         }
+    }
+
+    if (ImGui::BeginPopupContextWindow("ObjectsCreateMenu")) {
+        DrawCreateMenuItems(sceneRenderer);
+        ImGui::EndPopup();
     }
 
     ImGui::End();

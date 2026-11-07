@@ -28,15 +28,16 @@ void DrawPropertiesWindow(SceneRenderer& sceneRenderer, bool* open) {
         if (ImGui::BeginTabBar("PropertiesTabs")) {
             if (ImGui::BeginTabItem("Transform")) {
                 ImGui::Text("Position");
-                ImGui::DragFloat("X##Pos", &obj.position.x, 0.05f);
-                ImGui::DragFloat("Y##Pos", &obj.position.y, 0.05f);
-                ImGui::DragFloat("Z##Pos", &obj.position.z, 0.05f);
+                glm::vec3 positionMm = obj.position * 1000.0f;
+                if (ImGui::DragFloat("X##Pos", &positionMm.x, 5.0f, 0.0f, 0.0f, "%.1f mm")) obj.position.x = positionMm.x / 1000.0f;
+                if (ImGui::DragFloat("Y##Pos", &positionMm.y, 5.0f, 0.0f, 0.0f, "%.1f mm")) obj.position.y = positionMm.y / 1000.0f;
+                if (ImGui::DragFloat("Z##Pos", &positionMm.z, 5.0f, 0.0f, 0.0f, "%.1f mm")) obj.position.z = positionMm.z / 1000.0f;
 
                 ImGui::Spacing();
                 ImGui::Text("Rotation");
-                ImGui::DragFloat("X##Rot", &obj.rotation.x, 1.0f);
-                ImGui::DragFloat("Y##Rot", &obj.rotation.y, 1.0f);
-                ImGui::DragFloat("Z##Rot", &obj.rotation.z, 1.0f);
+                ImGui::DragFloat("X##Rot", &obj.rotation.x, 1.0f, 0.0f, 0.0f, "%.1f°");
+                ImGui::DragFloat("Y##Rot", &obj.rotation.y, 1.0f, 0.0f, 0.0f, "%.1f°");
+                ImGui::DragFloat("Z##Rot", &obj.rotation.z, 1.0f, 0.0f, 0.0f, "%.1f°");
 
                 ImGui::Spacing();
                 ImGui::Text("Scale");

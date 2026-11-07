@@ -12,6 +12,12 @@ A live 3D model viewer and editor built from scratch in C++ with OpenGL. Import 
 - Texture loading and per object texture management
 - Multi object scene support with selection and deletion
 - Editor style panels: Scene, Objects, Properties, and Console
+- Basic shapes: cube, sphere, cylinder, cone, capsule, torus, pyramid, and plane
+- Infinite grid, View and Gizmos menus, and snapping in millimeters
+- Click to select, move arrows, and G / S / R keys to move, scale, and rotate
+- Tinker, Mix, and Expert modes
+- Edit Mode with vertex, edge, and face selection (1 / 2 / 3)
+- Custom UI colors
 
 ## Planned
 - Multiplayer support so multiple people can view and edit the same scene together
@@ -41,6 +47,7 @@ src/            Sandbox source code
 assets/         Fonts, icons, and GLSL shaders (copied next to the exe on build)
 third_party/    Dear ImGui, GLAD, stb_image, tinyfiledialogs
 networking/     Rust P2P networking (rust-libp2p, in progress)
+screenshots/    README screenshots
 build.bat       Windows build script
 ```
 
@@ -52,16 +59,12 @@ build.bat       Windows build script
    ```
 3. Run `build.bat`. The app is built to `bin\RunBunSandbox.exe` along with its assets and DLLs.
 
-## Very Early Build/UI
-<img width="644" height="324" alt="image1" src="https://github.com/user-attachments/assets/67f1d5df-5ff1-48c8-9092-c500cf45110b" />
+## Current Build (11/07/26)
+Mix mode with a cube in Edit Mode and Face select.
 
-## Mid Build w/Decent looking UI
-<img width="2335" height="1197" alt="IMG_8111" src="https://github.com/user-attachments/assets/e2fb001d-aadf-45dd-ad50-e1112736d135" />
+<img width="1920" height="975" alt="RunBun Sandbox in Mix mode editing a cube face" src="screenshots/current-edit-mode.png" />
 
-## Starting to add the ability to customize and use templates for UI
-<img width="4032" height="3024" alt="IMG_8086" src="https://github.com/user-attachments/assets/3dbbd0f1-a08c-4efb-834f-c8faf73e8a09" />
-
-## Current Build (11/06/26)
+## Previous Build (11/06/26)
 Three grass blocks imported and textured, with the selected one's transform shown in the Properties panel.
 
 <img width="1600" height="900" alt="RunBun Sandbox with three textured grass blocks in the scene" src="screenshots/current-main.png" />
