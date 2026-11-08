@@ -606,7 +606,7 @@ void DrawSceneGizmo(SceneRenderer& sceneRenderer, UISettings& settings, ImVec2 v
         ScreenRay(viewProj, mouse, viewMin, viewSize, rayOrigin, rayDir);
         sceneRenderer.hoveredIndex = sceneRenderer.PickObject(rayOrigin, rayDir);
         glm::vec3 boundsMin, boundsMax;
-        if (settings.showDimensions && sceneRenderer.hoveredIndex >= 0 && objects[sceneRenderer.hoveredIndex].GetWorldBounds(boundsMin, boundsMax))
+        if (settings.showDimensions && sceneRenderer.hoveredIndex >= 0 && objects[sceneRenderer.hoveredIndex].look.light < 0 && objects[sceneRenderer.hoveredIndex].GetWorldBounds(boundsMin, boundsMax))
             DrawDimensions(drawList, viewProj, viewMin, viewSize, camera.position, boundsMin, boundsMax);
     }
 

@@ -20,6 +20,7 @@
 #include "ui/EditWindow.h"
 #include "ui/RoomWindow.h"
 #include "ui/RenderExport.h"
+#include "ui/ShadingWindow.h"
 #include "ui/RoomSync.h"
 #include "ui/UpdateWindow.h"
 #include "ui/HelpWindow.h"
@@ -181,6 +182,13 @@ int main() {
         } else if (workspace == Workspace_Edit) {
             PreparePanel("Edit");
             DrawEditWindow(sceneRenderer, nullptr);
+        } else if (workspace == Workspace_Shading) {
+            PreparePanel("Objects");
+            DrawObjectsWindow(sceneRenderer, nullptr);
+            PreparePanel("Shading");
+            DrawShadingWindow(sceneRenderer, nullptr);
+            PreparePanel("World");
+            DrawWorldWindow(sceneRenderer, nullptr);
         } else if (workspace == Workspace_Texturing) {
             PreparePanel("Objects");
             DrawObjectsWindow(sceneRenderer, nullptr);

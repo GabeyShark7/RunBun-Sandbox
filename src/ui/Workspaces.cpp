@@ -24,6 +24,7 @@ void SetWorkspace(SceneRenderer& sceneRenderer, int workspace) {
         EnterEditMode(sceneRenderer, sceneRenderer.selectedIndex);
 
     settings.workspace = workspace;
+    if (workspace == Workspace_Shading) settings.viewStyle = 1;
     ImGui::MarkIniSettingsDirty();
 }
 
@@ -45,6 +46,7 @@ void DrawWorkspaceTabs(SceneRenderer& sceneRenderer) {
         "Everything at once  (Ctrl+1)",
         "Reshape one object with lots of room  (Ctrl+2, or E with an object picked)",
         "Colors, images and how they wrap  (Ctrl+3)",
+        "Materials, noise, lights and the background  (Ctrl+4)",
     };
     ImVec4 accent = ImGui::GetStyleColorVec4(ImGuiCol_SliderGrab);
     ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.5f, 0.5f));

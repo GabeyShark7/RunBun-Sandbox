@@ -1,3 +1,4 @@
+#include "ui/LightIcons.h"
 #include <cstring>
 #include "ui/FileDialog.h"
 #include "core/Profiler.h"
@@ -83,6 +84,10 @@ ImVec2 DrawSceneWindow(SceneRenderer& sceneRenderer, UISettings& settings, bool*
 
         float rounding = ImGui::GetStyle().WindowRounding * 0.75f;
         ImGui::GetWindowDrawList()->AddImageRounded((ImTextureID)(intptr_t)textureID, imageMin, imageMax, ImVec2(0, 1), ImVec2(1, 0), IM_COL32_WHITE, rounding);
+        {
+            glm::mat4 lightViewProj = camera.GetProjectionMatrix((int)panelSize.x, (int)panelSize.y) * camera.GetViewMatrix();
+            DrawLightIcons(sceneRenderer, ImGui::GetWindowDrawList(), lightViewProj, imageMin, panelSize);
+        }
         bool handleTaken = DrawTinkerHandles(sceneRenderer, settings, imageMin, panelSize, viewHovered, viewActivated);
         DrawSceneGizmo(sceneRenderer, settings, imageMin, panelSize, viewHovered, viewActivated && !handleTaken, viewActive && !handleTaken);
         if (settings.showStatistics) DrawSceneStatistics(sceneRenderer, ImGui::GetWindowDrawList(), imageMin, imageMax);

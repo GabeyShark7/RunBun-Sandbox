@@ -1,5 +1,8 @@
 #include "ui/FileDialog.h"
 #include "tinyfiledialogs/tinyfiledialogs.h"
+
+// Paths come back as utf8
+[[maybe_unused]] static const bool utf8Paths = (tinyfd_winUtf8 = 1, true);
 #include <cctype>
 
 std::string OpenFileDialog() {

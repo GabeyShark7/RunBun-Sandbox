@@ -33,7 +33,8 @@ static void Hint(const char* text) {
 }
 
 static std::string FileName(const std::string& path) {
-    return std::filesystem::path(path).filename().string();
+    size_t slash = path.find_last_of("/\\");
+    return slash == std::string::npos ? path : path.substr(slash + 1);
 }
 
 // Same math as the shader
@@ -243,7 +244,7 @@ static void DrawRenderWindow(SceneRenderer& scene, int viewWidth, int viewHeight
             scene.shadows = settings.shadows;
             if (scene.RenderImage(width, height, renderTransparent, rgba, error)) {
                 std::vector<uint8_t> png = EncodePng(rgba.data(), width, height, 4, true);
-                std::ofstream file(path, std::ios::binary);
+                std::ofstream file(std::filesystem::u8path(path), std::ios::binary);
                 file.write((const char*)png.data(), (std::streamsize)png.size());
                 if (file.good() && !png.empty()) {
                     LogSuccess("Rendered " + std::to_string(width) + " x " + std::to_string(height) + " image to '" + FileName(path) + "'.");

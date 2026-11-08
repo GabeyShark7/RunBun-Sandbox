@@ -1,3 +1,4 @@
+#include <filesystem>
 #include "core/Profiler.h"
 #define GLM_ENABLE_EXPERIMENTAL
 #include "render/SceneRenderer.h"
@@ -181,6 +182,7 @@ static void SetFromMatrix(SceneObject& obj, const glm::mat4& matrix) {
 }
 
 bool SceneRenderer::GroupSelected() {
+    DropLightsFromSelection();
     if (selection.size() < 2) return false;
     glm::vec3 lo, hi;
     if (!GetSelectionBounds(lo, hi)) return false;
@@ -282,6 +284,7 @@ bool SceneRenderer::SetShapeSettings(int index, int sides, float thickness) {
 void SceneRenderer::DropSelectedToGround() {
     for (int index : selection) {
         glm::vec3 lo, hi;
+        if (objects[index].look.light >= 0) continue;
         if (objects[index].GetWorldBounds(lo, hi)) objects[index].position.z -= lo.z;
     }
 }
@@ -349,7 +352,7 @@ int SceneRenderer::ExportSTL(const std::string& path) {
             triangles++;
         }
     }
-    std::ofstream file(path, std::ios::binary);
+    std::ofstream file(std::filesystem::u8path(path), std::ios::binary);
     if (!file) return -1;
     char header[80] = {};
     snprintf(header, sizeof(header), "RunBun Sandbox export in millimeters");

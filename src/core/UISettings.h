@@ -10,7 +10,8 @@ enum Workspace {
     Workspace_Layout = 0,
     Workspace_Edit = 1,
     Workspace_Texturing = 2,
-    Workspace_Count = 3
+    Workspace_Shading = 3,
+    Workspace_Count = 4
 };
 
 enum LayoutMode {

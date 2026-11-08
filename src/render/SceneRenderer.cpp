@@ -214,6 +214,7 @@ void SceneRenderer::DrawWorld(const glm::mat4& view, const glm::mat4& projection
     glUniform1i(loc("shadeMode"), style == 1 ? 1 : (style == 2 ? 2 : 0));
     glUniform1f(loc("alphaScale"), 1.0f);
     glUniform1i(loc("unlit"), 0);
+    glUniform1i(loc("noiseType"), 0);
     int count = (int)lights.size();
     glUniform1i(loc("lightCount"), count);
     for (int i = 0; i < count; i++) {
@@ -251,7 +252,7 @@ void SceneRenderer::DrawWorld(const glm::mat4& view, const glm::mat4& projection
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         for (int i = 0; i < (int)objects.size(); i++) {
             SceneObject& obj = objects[i];
-            if (obj.look.light >= 0 && !showLights) continue;
+            if (obj.look.light >= 0) continue;
             bool picked = IsSelected(i);
             glm::vec4 color = picked ? glm::vec4(highlightColor, 1.0f) : glm::vec4(glm::mix(glm::vec3(obj.color), glm::vec3(0.85f), 0.5f), 1.0f);
             if (obj.hole || obj.ghost) color = glm::vec4(0.55f, 0.58f, 0.66f, 1.0f);
@@ -273,7 +274,7 @@ void SceneRenderer::DrawWorld(const glm::mat4& view, const glm::mat4& projection
             for (int i = 0; i < (int)objects.size(); i++) {
                 SceneObject& obj = objects[i];
                 bool isLight = obj.look.light >= 0;
-                if (isLight && (forImage || !showLights)) continue;
+                if (isLight) continue;
                 bool seeThrough = (obj.hole || obj.ghost) && !obj.showBase;
                 bool clear = seeThrough || xray || (style == 1 && obj.color.a < 0.999f && !isLight);
                 if (isLight) clear = false;
@@ -290,11 +291,27 @@ void SceneRenderer::DrawWorld(const glm::mat4& view, const glm::mat4& projection
                 glUniform1f(loc("roughness"), obj.look.roughness);
                 glUniform1f(loc("metallic"), obj.look.metallic);
                 glUniform1f(loc("glow"), obj.look.glow);
+                const ObjectLook& look = obj.look;
+                glUniform1i(loc("noiseType"), look.noise);
+                if (look.noise > 0) {
+                    glm::mat4 matrix = obj.GetModelMatrix();
+                    glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(matrix)));
+                    glUniform1f(loc("noiseScale"), look.noiseScale);
+                    glUniform1f(loc("noiseDetail"), look.noiseDetail);
+                    glUniform1f(loc("noiseContrast"), look.noiseContrast);
+                    glUniform1f(loc("noiseBump"), look.noiseBump);
+                    glUniform1f(loc("noiseRough"), look.noiseRough);
+                    glUniform1f(loc("noiseSeed"), look.noiseSeed);
+                    glUniform3fv(loc("noiseColor"), 1, look.noiseColor);
+                    glUniform3fv(loc("objectScale"), 1, glm::value_ptr(obj.scale));
+                    glUniformMatrix3fv(loc("localToWorldNormal"), 1, GL_FALSE, glm::value_ptr(normalMatrix));
+                }
                 obj.model.Draw(shaderProgram, view, projection, obj.GetModelMatrix(), &obj.DisplayMeshes());
             }
         }
         glUniform1f(loc("alphaScale"), 1.0f);
         glUniform1i(loc("unlit"), 0);
+        glUniform1i(loc("noiseType"), 0);
         glDepthMask(GL_TRUE);
         glDisable(GL_BLEND);
     }
@@ -313,6 +330,7 @@ void SceneRenderer::Render(ImVec2 panelSize) {
     if (width <= 0 || height <= 0) return;
 
     framebuffer.Resize(width, height);
+    lastViewHeight = height;
 
     framebuffer.Bind();
     DrawWorld(camera.GetViewMatrix(), camera.GetProjectionMatrix(width, height), width, height, false, false);
@@ -380,11 +398,7 @@ int SceneRenderer::CreateLight(int type) {
     static const char* names[Light_Count] = { "Sun Light", "Point Light", "Spot Light" };
     if (type < 0 || type >= Light_Count) return -1;
     SceneObject obj;
-    obj.model.AddMesh(CreatePrimitiveMesh(type == Light_Spot ? Primitive_Cone : Primitive_Sphere, 16, 0.25f));
-    glm::vec3 lo, hi;
-    obj.model.GetBounds(lo, hi);
-    float size = std::max(std::max(hi.x - lo.x, hi.y - lo.y), hi.z - lo.z);
-    obj.scale = glm::vec3((type == Light_Sun ? 0.3f : 0.18f) / std::max(size, 1e-4f));
+    obj.scale = glm::vec3(1.0f);
     obj.name = GenerateUniqueName(names[type]);
     obj.model.SetName(obj.name);
     obj.color = type == Light_Sun ? glm::vec4(1.0f, 0.97f, 0.92f, 1.0f) : glm::vec4(1.0f, 0.9f, 0.75f, 1.0f);
@@ -396,8 +410,14 @@ int SceneRenderer::CreateLight(int type) {
         float t = -camera.position.z / camera.front.z;
         if (t > 0.0f && t < 500.0f) focus = camera.position + camera.front * t;
     }
-    focus.z = 0.0f;
-    obj.position = focus + glm::vec3(0.0f, 0.0f, type == Light_Sun ? 4.0f : (type == Light_Point ? 1.5f : 3.0f));
+    // Somewhere you can see
+    float distance = std::clamp(glm::length(focus - camera.position), 3.0f, 20.0f);
+    glm::vec3 camRight = glm::normalize(glm::cross(camera.front, glm::vec3(0.0f, 0.0f, 1.0f)) + glm::vec3(1e-5f, 0.0f, 0.0f));
+    glm::vec3 camUp = glm::normalize(glm::cross(camRight, camera.front));
+    float lift = type == Light_Sun ? 0.28f : (type == Light_Spot ? 0.2f : 0.1f);
+    float side = type == Light_Sun ? -0.25f : (type == Light_Spot ? 0.2f : 0.05f);
+    obj.position = camera.position + camera.front * distance * 0.8f + camUp * distance * lift + camRight * distance * side;
+    obj.position.z = std::max(obj.position.z, 0.5f);
     if (type == Light_Sun) {
         // Shadow falls in view
         glm::vec3 flatFront = glm::normalize(glm::vec3(camera.front.x, camera.front.y, 0.0f) + glm::vec3(1e-4f, 0.0f, 0.0f));
@@ -521,7 +541,31 @@ int SceneRenderer::PickObject(const glm::vec3& rayOrigin, const glm::vec3& rayDi
     int best = -1;
     float bestT = FLT_MAX;
 
+    if (showLights) {
+        // Icons sit on top
+        float reach = glm::radians(camera.fov) * 13.0f / (float)std::max(lastViewHeight, 100);
+        float bestAngle = reach;
+        glm::vec3 ray = glm::normalize(rayDir);
+        for (int i = 0; i < (int)objects.size(); i++) {
+            if (objects[i].look.light < 0) continue;
+            glm::vec3 to = objects[i].position - rayOrigin;
+            float distance = glm::length(to);
+            if (distance < 1e-4f) continue;
+            float angle = std::acos(std::clamp(glm::dot(to / distance, ray), -1.0f, 1.0f));
+            if (angle < bestAngle) {
+                bestAngle = angle;
+                best = i;
+                bestT = distance;
+            }
+        }
+        if (best >= 0) {
+            if (outDistance) *outDistance = bestT;
+            return best;
+        }
+    }
+
     for (int i = 0; i < (int)objects.size(); i++) {
+        if (objects[i].look.light >= 0) continue;
         glm::vec3 boundsMin, boundsMax;
         if (!objects[i].GetLocalBounds(boundsMin, boundsMax)) continue;
 
@@ -575,11 +619,8 @@ void SceneRenderer::LoadTextureForSelected(const std::string& path) {
     size_t lastSlash = path.find_last_of("/\\");
     std::string texName = (lastSlash == std::string::npos) ? path : path.substr(lastSlash + 1);
 
-    unsigned int texID = AcquireTexture(path);
-    if (texID == 0) {
-        LogError("Failed to load texture '" + texName + "'.");
-        return;
-    }
+    unsigned int texID = AcquireTexture(path, true);
+    if (texID == 0) return;
 
     Model& model = objects[selectedIndex].model;
     model.AddTexture(texID, texName, path, model.GetTextures().empty());
@@ -754,6 +795,7 @@ void SceneRenderer::DuplicateSelected() {
 }
 
 bool SceneRenderer::JoinSelected() {
+    DropLightsFromSelection();
     if (selection.size() < 2) return false;
     int target = selection.front();
     bool anyHole = false, anySolid = false;
@@ -968,4 +1010,12 @@ void SceneRenderer::DrawEditWireframe(const glm::mat4& view, const glm::mat4& pr
     glDepthMask(GL_TRUE);
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
+}
+
+void SceneRenderer::DropLightsFromSelection() {
+    std::vector<int> kept;
+    for (int index : selection) if (index >= 0 && index < (int)objects.size() && objects[index].look.light < 0) kept.push_back(index);
+    if (kept.size() == selection.size()) return;
+    int active = std::find(kept.begin(), kept.end(), selectedIndex) != kept.end() ? selectedIndex : (kept.empty() ? -1 : kept.front());
+    SetSelection(kept, active);
 }

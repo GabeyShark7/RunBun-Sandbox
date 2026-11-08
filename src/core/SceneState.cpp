@@ -99,6 +99,7 @@ bool SceneMatches(SceneRenderer& scene, const SceneState& state) {
 }
 
 static void BuildMeshes(SceneObject& obj, const ObjectState& o) {
+    if (o.look.light >= 0) return;
     for (size_t m = 0; m < o.meshes.size(); m++) {
         Mesh mesh;
         mesh.Init(o.meshes[m]->vertices, o.meshes[m]->indices);
@@ -222,7 +223,7 @@ struct Reader {
 };
 
 static const char sceneMagic[4] = { 'R', 'B', 'S', 'N' };
-static const uint32_t sceneVersion = 4;
+static const uint32_t sceneVersion = 5;
 
 static void WriteObject(Writer& w, const ObjectState& o, bool withMeshes = true, bool withParts = true) {
     w.U32(o.id);
@@ -278,6 +279,14 @@ static void WriteObject(Writer& w, const ObjectState& o, bool withMeshes = true,
     w.F32(o.look.power);
     w.F32(o.look.spotAngle);
     w.U32(o.look.castShadows ? 1 : 0);
+    w.U32((uint32_t)o.look.noise);
+    w.F32(o.look.noiseScale);
+    w.F32(o.look.noiseDetail);
+    w.F32(o.look.noiseContrast);
+    w.F32(o.look.noiseBump);
+    w.F32(o.look.noiseRough);
+    w.F32(o.look.noiseSeed);
+    w.Vec(o.look.noiseColor, 3);
     uint32_t partCount = o.parts ? (uint32_t)o.parts->size() : 0;
     if (!withParts) {
         w.U32(0xFFFFFFFFu);
@@ -373,6 +382,17 @@ static bool ReadObject(Reader& r, uint32_t version, ObjectState& o, int depth) {
             o.look.spotAngle = r.F32();
             o.look.castShadows = r.U32() != 0;
             if (o.look.light < Light_None || o.look.light >= Light_Count) return false;
+        }
+        if (version >= 5) {
+            o.look.noise = (int)r.U32();
+            o.look.noiseScale = r.F32();
+            o.look.noiseDetail = r.F32();
+            o.look.noiseContrast = r.F32();
+            o.look.noiseBump = r.F32();
+            o.look.noiseRough = r.F32();
+            o.look.noiseSeed = r.F32();
+            r.Vec(o.look.noiseColor, 3);
+            if (o.look.noise < 0 || o.look.noise >= Noise_Count) return false;
         }
         uint32_t partCount = r.U32();
         o.keepParts = partCount == 0xFFFFFFFFu;

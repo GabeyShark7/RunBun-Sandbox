@@ -7,6 +7,7 @@
 #include "imgui/imgui.h"
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 
 static PanelCollapseState materialCollapse;
 
@@ -79,6 +80,17 @@ void DrawMaterialControls(SceneRenderer& sceneRenderer) {
             obj.look.roughness = presets[p].roughness;
             obj.look.metallic = presets[p].metallic;
             obj.look.glow = presets[p].glow;
+            obj.look.noise = presets[p].noise;
+            if (presets[p].noise > 0) {
+                obj.look.noiseScale = presets[p].noiseScale;
+                obj.look.noiseColor[0] = presets[p].nr;
+                obj.look.noiseColor[1] = presets[p].ng;
+                obj.look.noiseColor[2] = presets[p].nb;
+                obj.look.noiseBump = presets[p].bump;
+                obj.look.noiseDetail = 4.0f;
+                obj.look.noiseContrast = 0.3f;
+                obj.look.noiseRough = 0.0f;
+            }
         }
     }
     float field = full * 0.6f;
@@ -97,6 +109,39 @@ void DrawMaterialControls(SceneRenderer& sceneRenderer) {
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Lower lets you see through it, like glass");
     ImGui::Checkbox("Casts shadows", &obj.look.castShadows);
     Hint("Materials show in the Material view (Shift+Z) and in rendered images.");
+
+    ImGui::SeparatorText("Noise");
+    ImGui::SetNextItemWidth(field);
+    if (ImGui::BeginCombo("Pattern", NoiseName(obj.look.noise))) {
+        for (int n = 0; n < Noise_Count; n++)
+            if (ImGui::Selectable(NoiseName(n), n == obj.look.noise)) obj.look.noise = n;
+        ImGui::EndCombo();
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Paints a made up pattern over the object, no image needed");
+    if (obj.look.noise > 0) {
+        ImGui::ColorEdit3("##NoiseColor", obj.look.noiseColor, ImGuiColorEditFlags_PickerHueWheel);
+        ImGui::SameLine();
+        ImGui::TextUnformatted("Second color");
+        ImGui::SetNextItemWidth(field);
+        ImGui::SliderFloat("Size", &obj.look.noiseScale, 0.2f, 60.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Bigger numbers make smaller, busier spots");
+        ImGui::SetNextItemWidth(field);
+        ImGui::SliderFloat("Detail", &obj.look.noiseDetail, 1.0f, 8.0f, "%.0f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Layers of finer noise on top");
+        ImGui::SetNextItemWidth(field);
+        ImGui::SliderFloat("Contrast", &obj.look.noiseContrast, 0.0f, 1.0f, "%.2f");
+        ImGui::SetNextItemWidth(field);
+        ImGui::SliderFloat("Bumps", &obj.look.noiseBump, 0.0f, 1.0f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Makes the pattern look raised in the Material view");
+        ImGui::SetNextItemWidth(field);
+        ImGui::SliderFloat("Rough change", &obj.look.noiseRough, -1.0f, 1.0f, "%.2f");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("How much the pattern changes shininess");
+        ImGui::SetNextItemWidth(field);
+        ImGui::DragFloat("Seed", &obj.look.noiseSeed, 0.05f, -1000.0f, 1000.0f, "%.2f");
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Random")) obj.look.noiseSeed = (float)(rand() % 10000) / 100.0f;
+        Hint("Noise shows in RunBun and rendered images. Exports keep the main color.");
+    }
 
     ImGui::SeparatorText("Image");
     if (ImGui::Button("Load Image...", ImVec2(full, 0.0f))) {

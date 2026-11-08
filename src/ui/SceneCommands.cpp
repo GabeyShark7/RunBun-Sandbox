@@ -1,3 +1,4 @@
+#include <filesystem>
 #include "ui/RenderExport.h"
 #include "imgui/imgui_internal.h"
 #include "core/Profiler.h"
@@ -72,7 +73,7 @@ static void RefreshTitle() {
 static bool WriteScene(SceneRenderer& scene, const std::string& path) {
     HistoryTrack(scene);
     std::vector<uint8_t> bytes = SerializeScene(CaptureScene(scene, nullptr));
-    std::ofstream file(path, std::ios::binary);
+    std::ofstream file(std::filesystem::u8path(path), std::ios::binary);
     if (!file) {
         LogError("Could not save to '" + path + "'.");
         return false;
@@ -98,7 +99,7 @@ static void DoNew(SceneRenderer& scene) {
 static void DoOpen(SceneRenderer& scene) {
     std::string path = OpenSceneFileDialog();
     if (path.empty()) return;
-    std::ifstream file(path, std::ios::binary);
+    std::ifstream file(std::filesystem::u8path(path), std::ios::binary);
     std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
     SceneState state;
     if (!file.good() && !file.eof()) {
@@ -274,7 +275,7 @@ void CommandToggleHole(SceneRenderer& scene) {
     if (!HasObjectSelection(scene) || IsSceneTransformActive()) return;
     auto& objects = scene.GetObjects();
     bool makeHole = !objects[scene.selectedIndex].hole;
-    for (int i : scene.GetSelection()) objects[i].hole = makeHole;
+    for (int i : scene.GetSelection()) if (objects[i].look.light < 0) objects[i].hole = makeHole;
 }
 
 void CommandDrop(SceneRenderer& scene) {

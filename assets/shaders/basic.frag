@@ -2,6 +2,7 @@
 in vec2 TexCoord;
 in vec3 Normal;
 in vec3 WorldPos;
+in vec3 LocalPos;
 out vec4 FragColor;
 
 uniform sampler2D texture1;
@@ -38,6 +39,82 @@ uniform mat4 lightSpace;
 
 const float PI = 3.14159265;
 
+uniform int noiseType;
+uniform float noiseScale;
+uniform float noiseDetail;
+uniform float noiseContrast;
+uniform float noiseBump;
+uniform float noiseRough;
+uniform float noiseSeed;
+uniform vec3 noiseColor;
+uniform vec3 objectScale;
+uniform mat3 localToWorldNormal;
+
+vec3 Hash3(vec3 p) {
+    p = vec3(dot(p, vec3(127.1, 311.7, 74.7)), dot(p, vec3(269.5, 183.3, 246.1)), dot(p, vec3(113.5, 271.9, 124.6)));
+    return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
+}
+
+// Smooth gradient noise
+float Perlin(vec3 p) {
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    vec3 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    float n000 = dot(Hash3(i + vec3(0, 0, 0)), f - vec3(0, 0, 0));
+    float n100 = dot(Hash3(i + vec3(1, 0, 0)), f - vec3(1, 0, 0));
+    float n010 = dot(Hash3(i + vec3(0, 1, 0)), f - vec3(0, 1, 0));
+    float n110 = dot(Hash3(i + vec3(1, 1, 0)), f - vec3(1, 1, 0));
+    float n001 = dot(Hash3(i + vec3(0, 0, 1)), f - vec3(0, 0, 1));
+    float n101 = dot(Hash3(i + vec3(1, 0, 1)), f - vec3(1, 0, 1));
+    float n011 = dot(Hash3(i + vec3(0, 1, 1)), f - vec3(0, 1, 1));
+    float n111 = dot(Hash3(i + vec3(1, 1, 1)), f - vec3(1, 1, 1));
+    return mix(mix(mix(n000, n100, u.x), mix(n010, n110, u.x), u.y), mix(mix(n001, n101, u.x), mix(n011, n111, u.x), u.y), u.z) * 1.6;
+}
+
+float Fbm(vec3 p) {
+    float sum = 0.0, amp = 0.5, total = 0.0;
+    int octaves = int(clamp(noiseDetail, 1.0, 8.0));
+    for (int k = 0; k < 8; k++) {
+        if (k >= octaves) break;
+        sum += Perlin(p) * amp;
+        total += amp;
+        p = p * 2.03 + vec3(1.7, 9.2, 3.1);
+        amp *= 0.5;
+    }
+    return sum / total;
+}
+
+float Cells(vec3 p) {
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    float best = 8.0;
+    for (int x = -1; x <= 1; x++)
+        for (int y = -1; y <= 1; y++)
+            for (int z = -1; z <= 1; z++) {
+                vec3 cell = vec3(x, y, z);
+                vec3 point = cell + 0.5 + 0.5 * Hash3(i + cell);
+                best = min(best, length(point - f));
+            }
+    return clamp(best, 0.0, 1.0);
+}
+
+// Pattern value from 0 to 1
+float Pattern(vec3 p) {
+    float t = 0.0;
+    if (noiseType == 1) t = 0.5 + 0.5 * Perlin(p);
+    else if (noiseType == 2) t = 0.5 + 0.5 * Fbm(p);
+    else if (noiseType == 3) t = pow(1.0 - abs(sin(p.x * 1.5 + Fbm(p) * 5.0)), 5.0);
+    else if (noiseType == 4) t = fract(length(p.xy) * 2.0 + Fbm(p * 0.6) * 0.8);
+    else if (noiseType == 5) t = Cells(p);
+    else if (noiseType == 6) t = 0.5 + 0.5 * sin((p.x + p.y * 0.3) * 6.2831 + Fbm(p) * 1.5);
+    t = (t - 0.5) * (1.0 + noiseContrast * 4.0) + 0.5;
+    return clamp(t, 0.0, 1.0);
+}
+
+vec3 NoisePoint() {
+    return LocalPos * objectScale * noiseScale + vec3(17.31, 9.13, 3.71) * noiseSeed;
+}
+
 float ShadowAt(vec3 world, vec3 n, vec3 l) {
     vec4 p = lightSpace * vec4(world, 1.0);
     vec3 c = p.xyz / p.w * 0.5 + 0.5;
@@ -63,8 +140,8 @@ vec3 Studio(vec3 color, vec3 n, vec3 toEye, out float rim) {
     return color * (ambient + key + fill + head);
 }
 
-vec3 Pbr(vec3 albedo, vec3 n, vec3 v) {
-    float rough = clamp(roughness, 0.04, 1.0);
+vec3 Pbr(vec3 albedo, vec3 n, vec3 v, float noiseValue) {
+    float rough = clamp(roughness + noiseRough * (noiseValue - 0.5), 0.04, 1.0);
     float a = rough * rough;
     float a2 = a * a;
     vec3 f0 = mix(vec3(0.04), albedo, metallic);
@@ -115,6 +192,11 @@ void main() {
 
     vec2 uv = (uvTransform * vec3(TexCoord, 1.0)).xy;
     vec4 color = hasTexture ? texture(texture1, uv) * vec4(1.0, 1.0, 1.0, baseColor.a) : baseColor;
+    float noiseValue = 0.5;
+    if (noiseType > 0 && shadeMode != 2) {
+        noiseValue = Pattern(NoisePoint());
+        color.rgb = mix(color.rgb, noiseColor, noiseValue);
+    }
 
     if (shadeMode == 2) {
         FragColor = vec4(color.rgb, alphaScale);
@@ -132,8 +214,17 @@ void main() {
         vec3 toEye = normalize(viewPos - WorldPos);
         // Light both sides
         if (dot(n, toEye) < 0.0) n = -n;
+        if (noiseType > 0 && noiseBump > 0.0 && shadeMode == 1) {
+            // Bumps from pattern slope
+            vec3 p = NoisePoint();
+            float e = 0.02;
+            vec3 slope = vec3(Pattern(p + vec3(e, 0, 0)) - noiseValue, Pattern(p + vec3(0, e, 0)) - noiseValue, Pattern(p + vec3(0, 0, e)) - noiseValue) / e;
+            vec3 g = localToWorldNormal * (slope * objectScale);
+            g -= n * dot(g, n);
+            n = normalize(n - g * noiseBump * 0.08);
+        }
         if (shadeMode == 1) {
-            lit = Pbr(color.rgb, n, toEye);
+            lit = Pbr(color.rgb, n, toEye, noiseType > 0 ? noiseValue : 0.5);
             rim = pow(1.0 - max(dot(n, toEye), 0.0), 2.0);
         } else {
             lit = Studio(color.rgb, n, toEye, rim);

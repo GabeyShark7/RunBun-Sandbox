@@ -59,6 +59,7 @@ public:
     void FocusAll();
     int ExportSTL(const std::string& path);
     int CreateLight(int type);
+    void DropLightsFromSelection();
     // Rgba rows bottom first
     bool RenderImage(int width, int height, bool transparent, std::vector<uint8_t>& rgba, std::string& error);
     void UpdateDisplayMeshes(int editIndex, bool interacting = false);
@@ -80,6 +81,7 @@ public:
     std::string backgroundImage;
     bool shadows = true;
     bool showLights = true;
+    int lastViewHeight = 600;
 
 private:
     Framebuffer framebuffer;

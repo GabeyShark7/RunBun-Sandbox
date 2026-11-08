@@ -7,6 +7,8 @@
 #include <cfloat>
 #include <cstdio>
 #include "ui/MaterialWindow.h"
+#include "ui/Workspaces.h"
+#include "core/UISettings.h"
 #include "render/Primitives.h"
 #include "core/SceneState.h"
 
@@ -111,6 +113,8 @@ void DrawPropertiesWindow(SceneRenderer& sceneRenderer, bool* open) {
             }
 
             if (ImGui::BeginTabItem("Look")) {
+                if (WorkspaceAllowed(Workspace_Shading) && ImGui::Button("Open Shading Tab  (Ctrl+4)", ImVec2(-1.0f, 0.0f)))
+                    SetWorkspace(sceneRenderer, Workspace_Shading);
                 DrawMaterialControls(sceneRenderer);
                 ImGui::EndTabItem();
             }

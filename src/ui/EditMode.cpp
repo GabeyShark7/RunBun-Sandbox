@@ -278,6 +278,10 @@ bool EnterEditMode(SceneRenderer& sceneRenderer, int index) {
     Touch();
     auto& objects = sceneRenderer.GetObjects();
     if (index < 0 || index >= (int)objects.size()) return false;
+    if (objects[index].look.light >= 0 || objects[index].model.GetMeshes().empty()) {
+        Say("Lights have no shape to edit. Change them in the Shading tab.");
+        return false;
+    }
 
     std::vector<EditMesh> built;
     std::vector<PolyMesh> polys;

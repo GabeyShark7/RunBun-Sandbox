@@ -142,11 +142,11 @@ struct ImageFile {
 
 // Keeps png and jpg as is
 static bool LoadImageFile(const std::string& path, ImageFile& out) {
-    std::ifstream file(path, std::ios::binary);
+    std::ifstream file(fs::u8path(path), std::ios::binary);
     if (!file) return false;
     std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
     if (bytes.empty()) return false;
-    std::string ext = Lower(fs::path(path).extension().string());
+    std::string ext = Lower(fs::u8path(path).extension().string());
     if (ext == ".png") { out = { bytes, "image/png", "png" }; return true; }
     if (ext == ".jpg" || ext == ".jpeg") { out = { bytes, "image/jpeg", "jpg" }; return true; }
     int w, h, n;
@@ -286,7 +286,8 @@ static GltfBuild BuildGltf(const std::vector<ExportItem>& items, const ExportOpt
                         int bv = view(AddBin(build.bin, file.bytes.data(), file.bytes.size()), file.bytes.size(), 0);
                         entry = "{\"bufferView\":" + std::to_string(bv) + ",\"mimeType\":\"" + file.mime + "\"}";
                     } else {
-                        std::string stem = fs::path(m.texturePath).stem().string();
+                        auto stemText = fs::u8path(m.texturePath).stem().u8string();
+            std::string stem(stemText.begin(), stemText.end());
                         std::string name = baseName + "_" + stem + "." + file.extension;
                         for (int k = 2; usedNames.count(name); k++) name = baseName + "_" + stem + "_" + std::to_string(k) + "." + file.extension;
                         usedNames.insert(name);
@@ -372,9 +373,10 @@ ExportResult ExportModels(const std::vector<ExportItem>& items, const ExportOpti
     const ExportFormat& format = formats[options.format];
     if (items.empty()) { result.error = "Nothing to export."; return result; }
 
-    fs::path target(path);
+    fs::path target = fs::u8path(path);
     fs::path folder = target.parent_path();
-    std::string baseName = target.stem().string();
+    auto baseText = target.stem().u8string();
+    std::string baseName(baseText.begin(), baseText.end());
     bool embed = format.embeds && options.embedTextures;
     std::vector<ExportItem> work = items;
     if (!format.textures) for (ExportItem& item : work) item.material.texturePath.clear();
@@ -398,7 +400,7 @@ ExportResult ExportModels(const std::vector<ExportItem>& items, const ExportOpti
         build = BuildGltf(work, options, false, false, baseName, bake);
     }
     for (const auto& image : build.externalImages) {
-        if (!WriteFile(folder / image.first, image.second.bytes.data(), image.second.bytes.size())) {
+        if (!WriteFile(folder / fs::u8path(image.first), image.second.bytes.data(), image.second.bytes.size())) {
             result.error = "Could not write the image '" + image.first + "'.";
             return result;
         }

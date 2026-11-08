@@ -1,3 +1,4 @@
+#include <filesystem>
 #include "ui/Console.h"
 #include "imgui/imgui.h"
 #include "ui/DockLayout.h"
@@ -140,7 +141,7 @@ void DrawConsoleWindow(bool* open) {
         if (ImGui::SmallButton("Save")) {
             std::string path = SaveLogFileDialog("runbun-log.txt");
             if (!path.empty()) {
-                std::ofstream file(path);
+                std::ofstream file(std::filesystem::u8path(path));
                 file << AllText(shown);
                 if (file.good()) LogSuccess("Saved the log to '" + path + "'.");
                 else LogError("Could not save the log to '" + path + "'.");

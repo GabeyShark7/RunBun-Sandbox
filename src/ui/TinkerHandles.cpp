@@ -143,6 +143,10 @@ bool DrawTinkerHandles(SceneRenderer& sceneRenderer, UISettings& settings, ImVec
         return false;
     }
     SceneObject& obj = objects[selected];
+    if (obj.look.light >= 0) {
+        drag = HandleDrag();
+        return false;
+    }
     glm::vec3 lo, hi;
     if (!obj.GetLocalBounds(lo, hi)) return false;
 

@@ -58,6 +58,13 @@ struct SceneObject {
     }
 
     bool GetLocalBounds(glm::vec3& outMin, glm::vec3& outMax) const {
+        if (look.light >= 0) {
+            // Lights are only an icon
+            glm::vec3 half = glm::vec3(0.1f) / glm::max(glm::abs(scale), glm::vec3(1e-4f));
+            outMin = -half;
+            outMax = half;
+            return true;
+        }
         return UsesEvaluated() ? evaluated.GetBounds(outMin, outMax) : model.GetBounds(outMin, outMax);
     }
 

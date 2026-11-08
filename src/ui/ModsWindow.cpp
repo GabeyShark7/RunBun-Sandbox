@@ -57,6 +57,11 @@ void DrawModsWindow(SceneRenderer& sceneRenderer, bool* open) {
     SceneObject& obj = objects[selected];
     float full = ImGui::GetContentRegionAvail().x;
     ImGui::Text("%s", obj.name.c_str());
+    if (obj.look.light >= 0) {
+        ImGui::TextDisabled("Lights have no shape to change.");
+        ImGui::End();
+        return;
+    }
     Hint("Mods change the shape without touching the original, so you can tweak or remove them any time. Apply makes them permanent.");
     if (IsEditModeActive() && GetEditObjectIndex() == selected) Hint("Mods are hidden while you edit the shape underneath.");
 

@@ -40,6 +40,13 @@ static const FloatingRect texturingRects[] = {
     { "UV",       0.705f, 0.45f, 0.280f, 0.52f },
 };
 
+static const FloatingRect shadingRects[] = {
+    { "Objects", 0.015f, 0.03f, 0.160f, 0.94f },
+    { "Scene",   0.190f, 0.03f, 0.540f, 0.94f },
+    { "Shading", 0.745f, 0.03f, 0.240f, 0.55f },
+    { "World",   0.745f, 0.60f, 0.240f, 0.37f },
+};
+
 struct WorkspaceInfo {
     const char* title;
     const char* dockName;
@@ -52,6 +59,7 @@ static const WorkspaceInfo workspaces[Workspace_Count] = {
     { "Layout",    "RunBunDockSpace",          "",             layoutRects,    IM_ARRAYSIZE(layoutRects) },
     { "Edit",      "RunBunDockSpaceEdit",      "##Edit",       editRects,      IM_ARRAYSIZE(editRects) },
     { "Texturing", "RunBunDockSpaceTexturing2", "##Texturing",  texturingRects, IM_ARRAYSIZE(texturingRects) },
+    { "Shading",   "RunBunDockSpaceShading",   "##Shading",    shadingRects,   IM_ARRAYSIZE(shadingRects) },
 };
 
 int ActiveWorkspace() {
@@ -128,11 +136,23 @@ static void BuildTexturingWorkspace(ImGuiID dockId) {
     ImGui::DockBuilderDockWindow("UV##Texturing", rightBottom);
 }
 
+static void BuildShadingWorkspace(ImGuiID dockId) {
+    ImGuiID center = dockId;
+    ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.16f, nullptr, &center);
+    ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.30f, nullptr, &center);
+    ImGuiID rightBottom = ImGui::DockBuilderSplitNode(right, ImGuiDir_Down, 0.42f, nullptr, &right);
+    ImGui::DockBuilderDockWindow("Scene##Shading", center);
+    ImGui::DockBuilderDockWindow("Objects##Shading", left);
+    ImGui::DockBuilderDockWindow("Shading##Shading", right);
+    ImGui::DockBuilderDockWindow("World##Shading", rightBottom);
+}
+
 static void BuildWorkspace(int workspace, ImGuiID dockId, bool docked) {
     ClearDockSpace(dockId);
     if (docked) {
         if (workspace == Workspace_Edit) BuildEditWorkspace(dockId);
         else if (workspace == Workspace_Texturing) BuildTexturingWorkspace(dockId);
+        else if (workspace == Workspace_Shading) BuildShadingWorkspace(dockId);
         else BuildLayoutWorkspace(dockId);
     } else {
         floatingPlacementPending = true;

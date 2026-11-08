@@ -373,6 +373,14 @@ static int fileExists( char const * const aFilePathAndName )
 	{
 		return 0 ;
 	}
+#ifdef _WIN32
+	wchar_t lWide[MAX_PATH_OR_CMD] ;
+	if ( tinyfd_winUtf8 && MultiByteToWideChar( CP_UTF8 , 0 , aFilePathAndName , -1 , lWide , MAX_PATH_OR_CMD ) > 0 )
+	{
+		lIn = _wfopen( lWide , L"r" ) ;
+	}
+	else
+#endif
 	lIn = fopen( aFilePathAndName , "r" ) ;
 	if ( ! lIn )
 	{
@@ -484,6 +492,16 @@ static int dirExists ( char const * const aDirPath )
 	struct stat lInfo;
 	if ( ! aDirPath || ! strlen ( aDirPath ) )
 		return 0 ;
+#ifdef _WIN32
+	{
+		wchar_t lWide[MAX_PATH_OR_CMD] ;
+		if ( tinyfd_winUtf8 && MultiByteToWideChar( CP_UTF8 , 0 , aDirPath , -1 , lWide , MAX_PATH_OR_CMD ) > 0 )
+		{
+			DWORD lAttributes = GetFileAttributesW( lWide ) ;
+			return lAttributes != INVALID_FILE_ATTRIBUTES && ( lAttributes & FILE_ATTRIBUTE_DIRECTORY ) ;
+		}
+	}
+#endif
 	if ( stat ( aDirPath , & lInfo ) != 0 )
 		return 0 ;
 	else if ( lInfo.st_mode & S_IFDIR )

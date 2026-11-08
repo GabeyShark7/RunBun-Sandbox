@@ -17,7 +17,7 @@
 enum SyncType { Sync_Snapshot = 1, Sync_Batch = 2 };
 enum OpKind { Op_Upsert = 1, Op_Remove = 2, Op_Presence = 3, Op_Image = 4, Op_Permission = 5, Op_Patch = 6 };
 
-static const uint32_t syncVersion = 4;
+static const uint32_t syncVersion = 5;
 static const size_t maxImage = 8 * 1024 * 1024;
 
 static RoomSender sender;
@@ -133,7 +133,7 @@ static std::string Extension(const std::string& path) {
 }
 
 static bool ReadFile(const std::string& path, std::vector<uint8_t>& out) {
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    std::ifstream file(std::filesystem::u8path(path), std::ios::binary | std::ios::ate);
     if (!file) return false;
     std::streamsize size = file.tellg();
     if (size <= 0 || (size_t)size > maxImage) return false;
@@ -368,8 +368,9 @@ static void StoreImage(In& in) {
     if (key.find_first_of("/\\:") != std::string::npos) { in.at += size; return; }
     if (hashToLocal.count(key)) { in.at += size; return; }
     std::filesystem::create_directories("room_images");
-    std::string path = (std::filesystem::current_path() / "room_images" / key).string();
-    std::ofstream file(path, std::ios::binary);
+    auto wide = (std::filesystem::current_path() / "room_images" / key).u8string();
+    std::string path(wide.begin(), wide.end());
+    std::ofstream file(std::filesystem::u8path(path), std::ios::binary);
     file.write((const char*)in.data + in.at, size);
     in.at += size;
     if (file.good()) {
