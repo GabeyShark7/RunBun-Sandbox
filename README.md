@@ -3,7 +3,7 @@
 A live 3D modeling sandbox built from scratch in C++ with OpenGL. Make shapes, reshape them in Edit Mode, give them materials, lights and noise patterns, render pictures, export to other 3D apps, and build together with friends in shared rooms over your network.
 
 ## Clarity (PLEASE READ)
-- I did NOT make an early repo for this project. I wouldn't say it was very in depth before my first commit, but there was some decent progress done. I wasn't thinking at the time of making this a public project, but did manage to capture some early images of the UI and features. See the images below.
+- I did NOT make an early repo for this project. I wouldn't say it was very in depth before my first commit, but there was some decent progress done. I wasn't thinking at the time of making this a public project, but did manage to capture some early images of the UI and features. See the images of early UI upon request.
 
 ## Features
 
