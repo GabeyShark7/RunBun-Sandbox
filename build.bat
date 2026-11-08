@@ -29,7 +29,7 @@ g++ -std=gnu++20 -O2 ^
     %TP%\imgui\imgui.cpp %TP%\imgui\imgui_draw.cpp %TP%\imgui\imgui_tables.cpp %TP%\imgui\imgui_widgets.cpp %TP%\imgui\imgui_demo.cpp ^
     %TP%\imgui\backends\imgui_impl_glfw.cpp %TP%\imgui\backends\imgui_impl_opengl3.cpp ^
     %OBJ%\glad.o %OBJ%\tinyfiledialogs.o ^
-    -L%MSYS%\ucrt64\lib -lassimp -lglfw3 -lcomdlg32 -lole32 -lshell32 -lwinhttp ^
+    -L%MSYS%\ucrt64\lib -lassimp -lglfw3 -l:libz.a -lcomdlg32 -lole32 -lshell32 -lwinhttp ^
     -L%NET%\target\release -lrunbun_net -lbcrypt -ladvapi32 -lntdll -luserenv -lws2_32 -ldbghelp ^
     -static-libstdc++ -static-libgcc ^
     -o %OUT%\RunBunSandbox.exe || goto fail

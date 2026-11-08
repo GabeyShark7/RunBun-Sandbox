@@ -1,13 +1,13 @@
-use crate::protocol::{clean_text, join_proof, verify_proof, Msg, Reply, MAX_CHAT, MAX_NAME, PROTOCOL};
+use crate::protocol::{clean_text, join_proof, verify_proof, Msg, Reply, MAX_CHAT, MAX_NAME, MAX_SCENE, PROTOCOL, SCENE_CHUNK};
 use crate::room_key::RoomKey;
 use futures::StreamExt;
-use libp2p::request_response::{self, ProtocolSupport, ResponseChannel};
+use libp2p::request_response::{self, OutboundRequestId, ProtocolSupport, ResponseChannel};
 use libp2p::swarm::{NetworkBehaviour, SwarmEvent};
 use libp2p::{multiaddr::Protocol, noise, tcp, yamux, Multiaddr, PeerId, StreamProtocol, Swarm};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::future::Future;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
-use std::sync::mpsc;
+use std::sync::{mpsc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -21,6 +21,8 @@ pub enum Command {
     Kick(String),
     Peers,
     Leave,
+    Limits { max_people: u32, open: bool },
+    Scene { data: Vec<u8>, to: Option<String>, skip: Option<String>, from: Option<String> },
 }
 
 #[derive(Debug, Clone)]
@@ -33,6 +35,8 @@ pub enum Event {
     Peers(Vec<String>),
     Info(String),
     Closed(String),
+    Scene { from: String, data: Vec<u8> },
+    Progress { from: String, received: u64, total: u64 },
 }
 
 #[derive(NetworkBehaviour)]
@@ -44,6 +48,7 @@ pub struct RoomHandle {
     commands: UnboundedSender<Command>,
     events: mpsc::Receiver<Event>,
     thread: Option<JoinHandle<()>>,
+    pub scene: Mutex<Vec<u8>>,
 }
 
 #[derive(Clone)]
@@ -87,7 +92,7 @@ impl RoomHandle {
                 .expect("tokio runtime");
             runtime.block_on(task(command_rx, Out(event_tx)));
         });
-        Self { commands: command_tx, events: event_rx, thread: Some(thread) }
+        Self { commands: command_tx, events: event_rx, thread: Some(thread), scene: Mutex::new(Vec::new()) }
     }
 
     pub fn send(&self, command: Command) {
@@ -119,7 +124,7 @@ impl Drop for RoomHandle {
 fn build_swarm() -> Result<Swarm<Behaviour>, String> {
     let swarm = libp2p::SwarmBuilder::with_new_identity()
         .with_tokio()
-        .with_tcp(tcp::Config::default(), noise::Config::new, yamux::Config::default)
+        .with_tcp(tcp::Config::default().nodelay(true), noise::Config::new, yamux::Config::default)
         .map_err(|e| e.to_string())?
         .with_behaviour(|_| Behaviour {
             room: request_response::cbor::Behaviour::new(
@@ -147,6 +152,69 @@ fn lan_ip() -> Option<Ipv4Addr> {
     }
 }
 
+// One scene send at a time
+#[derive(Default)]
+struct Outbox {
+    queue: VecDeque<Msg>,
+    inflight: Option<OutboundRequestId>,
+}
+
+fn pump(swarm: &mut Swarm<Behaviour>, outboxes: &mut HashMap<PeerId, Outbox>, peer: PeerId) {
+    let outbox = outboxes.entry(peer).or_default();
+    if outbox.inflight.is_some() {
+        return;
+    }
+    if let Some(msg) = outbox.queue.pop_front() {
+        outbox.inflight = Some(swarm.behaviour_mut().room.send_request(&peer, msg));
+    }
+}
+
+fn enqueue_scene(swarm: &mut Swarm<Behaviour>, outboxes: &mut HashMap<PeerId, Outbox>, peer: PeerId, from: &str, id: u64, data: &[u8]) {
+    let total = data.len().div_ceil(SCENE_CHUNK).max(1) as u32;
+    let outbox = outboxes.entry(peer).or_default();
+    for part in 0..total {
+        let start = part as usize * SCENE_CHUNK;
+        let end = (start + SCENE_CHUNK).min(data.len());
+        outbox.queue.push_back(Msg::Scene { from: from.to_string(), id, part, total, size: data.len() as u64, data: data[start..end].to_vec() });
+    }
+    pump(swarm, outboxes, peer);
+}
+
+fn finished(swarm: &mut Swarm<Behaviour>, outboxes: &mut HashMap<PeerId, Outbox>, peer: PeerId, request: OutboundRequestId) {
+    let Some(outbox) = outboxes.get_mut(&peer) else { return };
+    if outbox.inflight == Some(request) {
+        outbox.inflight = None;
+        pump(swarm, outboxes, peer);
+    }
+}
+
+// Chunks arrive in order
+#[derive(Default)]
+struct Incoming {
+    parts: HashMap<PeerId, (u64, Vec<u8>)>,
+}
+
+impl Incoming {
+    fn add(&mut self, peer: PeerId, from: &str, id: u64, part: u32, total: u32, size: u64, data: Vec<u8>, out: &Out) -> Option<Vec<u8>> {
+        if size > MAX_SCENE {
+            return None;
+        }
+        let entry = self.parts.entry(peer).or_insert_with(|| (id, Vec::new()));
+        if part == 0 || entry.0 != id {
+            *entry = (id, Vec::with_capacity(size as usize));
+        }
+        entry.1.extend_from_slice(&data);
+        if total > 1 {
+            out.emit(Event::Progress { from: from.to_string(), received: entry.1.len() as u64, total: size });
+        }
+        if part + 1 >= total {
+            let (_, done) = self.parts.remove(&peer)?;
+            return Some(done);
+        }
+        None
+    }
+}
+
 fn reply(swarm: &mut Swarm<Behaviour>, channel: ResponseChannel<Reply>, response: Reply) {
     let _ = swarm.behaviour_mut().room.send_response(channel, response);
 }
@@ -157,6 +225,9 @@ struct HostState {
     peers: HashMap<PeerId, String>,
     pending: HashMap<PeerId, Instant>,
     denied: HashSet<PeerId>,
+    hang_up: HashMap<PeerId, Instant>,
+    max_people: usize,
+    open: bool,
 }
 
 impl HostState {
@@ -201,14 +272,30 @@ async fn run_host(name: String, port: u16, mut commands: UnboundedReceiver<Comma
         peers: HashMap::new(),
         pending: HashMap::new(),
         denied: HashSet::new(),
+        hang_up: HashMap::new(),
+        max_people: 16,
+        open: true,
     };
     let mut announced = false;
     let mut tick = tokio::time::interval(Duration::from_secs(1));
+    let mut outboxes: HashMap<PeerId, Outbox> = HashMap::new();
+    let mut incoming = Incoming::default();
+    let mut next_id: u64 = 1;
 
     loop {
         tokio::select! {
             command = commands.recv() => match command {
                 None | Some(Command::Leave) => return Ok("You closed the room".into()),
+                Some(Command::Scene { data, to, skip, from }) => {
+                    let from = from.unwrap_or_else(|| state.name.clone());
+                    let targets: Vec<PeerId> = state.peers.iter()
+                        .filter(|(_, n)| to.as_ref().map_or(true, |t| *t == **n) && skip.as_ref().map_or(true, |s| *s != **n))
+                        .map(|(p, _)| *p).collect();
+                    next_id += 1;
+                    for peer in targets {
+                        enqueue_scene(&mut swarm, &mut outboxes, peer, &from, next_id, &data);
+                    }
+                }
                 Some(Command::Chat(text)) => {
                     let msg = Msg::Chat { from: state.name.clone(), text: clean_text(&text, MAX_CHAT) };
                     broadcast(&mut swarm, &state.peers, None, msg);
@@ -220,6 +307,10 @@ async fn run_host(name: String, port: u16, mut commands: UnboundedReceiver<Comma
                     }
                 }
                 Some(Command::Peers) => out.emit(Event::Peers(state.names())),
+                Some(Command::Limits { max_people, open }) => {
+                    state.max_people = (max_people as usize).max(2);
+                    state.open = open;
+                }
             },
 
             _ = tick.tick() => {
@@ -230,6 +321,14 @@ async fn run_host(name: String, port: u16, mut commands: UnboundedReceiver<Comma
                     .map(|(p, _)| *p).collect();
                 for peer in stale {
                     state.pending.remove(&peer);
+                    let _ = swarm.disconnect_peer_id(peer);
+                }
+                // Let refusal land first
+                let due: Vec<PeerId> = state.hang_up.iter()
+                    .filter(|(_, t)| now.duration_since(**t) > Duration::from_millis(500))
+                    .map(|(p, _)| *p).collect();
+                for peer in due {
+                    state.hang_up.remove(&peer);
                     let _ = swarm.disconnect_peer_id(peer);
                 }
             }
@@ -249,8 +348,11 @@ async fn run_host(name: String, port: u16, mut commands: UnboundedReceiver<Comma
                     }
                 }
                 SwarmEvent::ConnectionClosed { peer_id, num_established: 0, .. } => {
+                    outboxes.remove(&peer_id);
+                    incoming.parts.remove(&peer_id);
                     state.pending.remove(&peer_id);
                     state.denied.remove(&peer_id);
+                    state.hang_up.remove(&peer_id);
                     if let Some(left) = state.peers.remove(&peer_id) {
                         broadcast(&mut swarm, &state.peers, None, Msg::PeerLeft { name: left.clone() });
                         out.emit(Event::PeerLeft(left));
@@ -261,9 +363,25 @@ async fn run_host(name: String, port: u16, mut commands: UnboundedReceiver<Comma
                         peer,
                         message: request_response::Message::Request { request, channel, .. },
                         ..
-                    } => handle_host_request(&mut swarm, &mut state, me, peer, request, channel, out),
+                    } => {
+                        if let Msg::Scene { id, part, total, size, data, .. } = request {
+                            reply(&mut swarm, channel, Reply::Ok);
+                            let Some(from) = state.peers.get(&peer).cloned() else { continue };
+                            if let Some(done) = incoming.add(peer, &from, id, part, total, size, data, out) {
+                                out.emit(Event::Scene { from, data: done });
+                            }
+                        } else {
+                            handle_host_request(&mut swarm, &mut state, me, peer, request, channel, out);
+                        }
+                    }
+                    request_response::Event::Message { peer, message: request_response::Message::Response { request_id, .. }, .. } => {
+                        finished(&mut swarm, &mut outboxes, peer, request_id);
+                    }
+                    request_response::Event::OutboundFailure { peer, request_id, .. } => {
+                        finished(&mut swarm, &mut outboxes, peer, request_id);
+                    }
                     request_response::Event::ResponseSent { peer, .. } if state.denied.contains(&peer) => {
-                        let _ = swarm.disconnect_peer_id(peer);
+                        state.hang_up.entry(peer).or_insert_with(Instant::now);
                     }
                     _ => {}
                 },
@@ -286,7 +404,16 @@ fn handle_host_request(
         Msg::Join { name, proof } => {
             if state.peers.contains_key(&peer) {
                 reply(swarm, channel, Reply::Ok);
-            } else if verify_proof(&state.secret, &me, &peer, &proof) {
+            } else if !verify_proof(&state.secret, &me, &peer, &proof) {
+                state.denied.insert(peer);
+                reply(swarm, channel, Reply::Denied { reason: "Wrong room key".into() });
+                out.emit(Event::Info("Turned away a join with a wrong key".into()));
+            } else if !state.open || state.peers.len() + 1 >= state.max_people {
+                let reason = if state.open { "The room is full" } else { "The room is locked" };
+                state.denied.insert(peer);
+                reply(swarm, channel, Reply::Denied { reason: reason.into() });
+                out.emit(Event::Info(format!("Turned away {} because {}", clean_text(&name, MAX_NAME), reason.to_lowercase())));
+            } else {
                 let name = state.unique_name(&name);
                 let peers = state.peers.values().cloned().collect();
                 reply(swarm, channel, Reply::Welcome { host: state.name.clone(), you: name.clone(), peers });
@@ -294,10 +421,6 @@ fn handle_host_request(
                 state.pending.remove(&peer);
                 state.peers.insert(peer, name.clone());
                 out.emit(Event::PeerJoined(name));
-            } else {
-                state.denied.insert(peer);
-                reply(swarm, channel, Reply::Denied { reason: "Wrong room key".into() });
-                out.emit(Event::Info("Turned away a join with a wrong key".into()));
             }
         }
         Msg::Chat { text, .. } => {
@@ -330,11 +453,21 @@ async fn run_join(name: String, key: RoomKey, mut commands: UnboundedReceiver<Co
     let mut joined = false;
     let mut peers: Vec<String> = Vec::new();
     let mut tick = tokio::time::interval(Duration::from_secs(1));
+    let mut outboxes: HashMap<PeerId, Outbox> = HashMap::new();
+    let mut incoming = Incoming::default();
+    let mut next_id: u64 = 1;
 
     loop {
         tokio::select! {
             command = commands.recv() => match command {
                 None | Some(Command::Leave) => return Ok("You left the room".into()),
+                Some(Command::Scene { data, .. }) => match host {
+                    Some(h) if joined => {
+                        next_id += 1;
+                        enqueue_scene(&mut swarm, &mut outboxes, h, &name, next_id, &data);
+                    }
+                    _ => {}
+                },
                 Some(Command::Chat(text)) => match host {
                     Some(h) if joined => {
                         swarm.behaviour_mut().room.send_request(&h, Msg::Chat { from: name.clone(), text });
@@ -342,6 +475,7 @@ async fn run_join(name: String, key: RoomKey, mut commands: UnboundedReceiver<Co
                     _ => out.emit(Event::Info("Not in the room yet".into())),
                 },
                 Some(Command::Kick(_)) => out.emit(Event::Info("Only the host can kick".into())),
+                Some(Command::Limits { .. }) => {}
                 Some(Command::Peers) => out.emit(Event::Peers(peers.clone())),
             },
 
@@ -363,10 +497,15 @@ async fn run_join(name: String, key: RoomKey, mut commands: UnboundedReceiver<Co
                 SwarmEvent::ConnectionClosed { peer_id, num_established: 0, .. } if Some(peer_id) == host => {
                     return Ok(if joined { "The host closed the room".into() } else { "The host hung up".into() });
                 }
+                SwarmEvent::Behaviour(BehaviourEvent::Room(request_response::Event::OutboundFailure { peer, request_id, .. })) => {
+                    finished(&mut swarm, &mut outboxes, peer, request_id);
+                }
                 SwarmEvent::Behaviour(BehaviourEvent::Room(request_response::Event::Message { peer, message, .. })) => {
                     if Some(peer) != host { continue; }
                     match message {
-                        request_response::Message::Response { response, .. } => match response {
+                        request_response::Message::Response { response, request_id } => {
+                            finished(&mut swarm, &mut outboxes, peer, request_id);
+                            match response {
                             Reply::Welcome { host: host_name, you, peers: others } => {
                                 joined = true;
                                 peers = std::iter::once(format!("{host_name} (host)")).chain(others.iter().cloned()).collect();
@@ -375,7 +514,8 @@ async fn run_join(name: String, key: RoomKey, mut commands: UnboundedReceiver<Co
                             }
                             Reply::Denied { reason } => return Ok(format!("Join refused: {reason}")),
                             Reply::Ok => {}
-                        },
+                            }
+                        }
                         request_response::Message::Request { request, channel, .. } => {
                             reply(&mut swarm, channel, Reply::Ok);
                             match request {
@@ -387,6 +527,11 @@ async fn run_join(name: String, key: RoomKey, mut commands: UnboundedReceiver<Co
                                 Msg::PeerLeft { name: who } => {
                                     peers.retain(|p| *p != who);
                                     out.emit(Event::PeerLeft(who));
+                                }
+                                Msg::Scene { from, id, part, total, size, data } => {
+                                    if let Some(done) = incoming.add(peer, &from, id, part, total, size, data, out) {
+                                        out.emit(Event::Scene { from, data: done });
+                                    }
                                 }
                                 Msg::Join { .. } => {}
                             }

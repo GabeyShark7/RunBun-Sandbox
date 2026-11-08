@@ -62,3 +62,61 @@ fn wrong_secret_is_refused() {
         _ => unreachable!(),
     }
 }
+
+#[test]
+fn scene_data_flows_in_order() {
+    let (host, key) = open_room("Host", 47403);
+    let guest = RoomHandle::join("Guest", key);
+    next(&guest, |e| matches!(e, Event::Joined { .. }));
+    next(&host, |e| matches!(e, Event::PeerJoined(n) if n == "Guest"));
+
+    // Big enough to split
+    let big: Vec<u8> = (0..900_000u32).map(|i| (i % 251) as u8).collect();
+    host.send(Command::Scene { data: big.clone(), to: Some("Guest".into()), skip: None, from: None });
+    match next(&guest, |e| matches!(e, Event::Scene { .. })) {
+        Event::Scene { from, data } => {
+            assert_eq!(from, "Host");
+            assert_eq!(data, big);
+        }
+        _ => unreachable!(),
+    }
+
+    for i in 0..20u8 {
+        guest.send(Command::Scene { data: vec![i; 10], to: None, skip: None, from: None });
+    }
+    for i in 0..20u8 {
+        match next(&host, |e| matches!(e, Event::Scene { .. })) {
+            Event::Scene { from, data } => {
+                assert_eq!(from, "Guest");
+                assert_eq!(data, vec![i; 10]);
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    host.send(Command::Scene { data: vec![7; 5], to: None, skip: None, from: Some("Guest".into()) });
+    match next(&guest, |e| matches!(e, Event::Scene { .. })) {
+        Event::Scene { from, .. } => assert_eq!(from, "Guest"),
+        _ => unreachable!(),
+    }
+}
+
+#[test]
+fn full_and_locked_rooms_refuse() {
+    let (host, key) = open_room("Host", 47404);
+    host.send(Command::Limits { max_people: 2, open: true });
+    let first = RoomHandle::join("First", key);
+    next(&host, |e| matches!(e, Event::PeerJoined(n) if n == "First"));
+    let second = RoomHandle::join("Second", key);
+    match next(&second, |e| matches!(e, Event::Closed(_))) {
+        Event::Closed(reason) => assert!(reason.contains("full"), "{reason}"),
+        _ => unreachable!(),
+    }
+    host.send(Command::Limits { max_people: 8, open: false });
+    let third = RoomHandle::join("Third", key);
+    match next(&third, |e| matches!(e, Event::Closed(_))) {
+        Event::Closed(reason) => assert!(reason.contains("locked"), "{reason}"),
+        _ => unreachable!(),
+    }
+    drop(first);
+}

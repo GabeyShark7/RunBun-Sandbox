@@ -1,9 +1,12 @@
 #include "render/Mesh.h"
 
+static unsigned int revisionCounter = 0;
+
 void Mesh::Init(std::vector<Vertex> vertices, std::vector<unsigned int> indices) {
     indexCount = (int)indices.size();
     cpuVertices = vertices;
     cpuIndices = indices;
+    revision = ++revisionCounter;
     UpdateBounds();
 
     glGenVertexArrays(1, &VAO);
@@ -45,10 +48,16 @@ void Mesh::UpdateBounds() {
 void Mesh::UpdateVertices(const std::vector<Vertex>& vertices) {
     if (vertices.size() != cpuVertices.size()) return;
     cpuVertices = vertices;
+    revision = ++revisionCounter;
     UpdateBounds();
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(Vertex), vertices.data());
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void Mesh::Rebuild(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices) {
+    Destroy();
+    Init(vertices, indices);
 }
 
 void Mesh::Draw() {

@@ -1,8 +1,10 @@
 #include "render/TextureLoader.h"
+#include "ui/Console.h"
 #include <glad/glad.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
 #include <iostream>
+#include <map>
 
 unsigned int LoadTexture(const std::string& path) {
     unsigned int textureID;
@@ -29,9 +31,18 @@ unsigned int LoadTexture(const std::string& path) {
         stbi_image_free(data);
     } else {
         std::cout << "Failed to load texture: " << path << "\n";
+        LogError("Could not load the image '" + std::string(path) + "'.");
         glDeleteTextures(1, &textureID);
         return 0; // 0 = no texture, callers check for this
     }
 
     return textureID;
+}
+unsigned int AcquireTexture(const std::string& path) {
+    static std::map<std::string, unsigned int> cache;
+    auto found = cache.find(path);
+    if (found != cache.end()) return found->second;
+    unsigned int id = LoadTexture(path);
+    if (id != 0) cache[path] = id;
+    return id;
 }

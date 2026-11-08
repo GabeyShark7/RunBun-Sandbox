@@ -6,3 +6,6 @@ struct UISettings;
 
 void DrawSceneGizmo(SceneRenderer& sceneRenderer, UISettings& settings, ImVec2 viewMin, ImVec2 viewSize, bool viewHovered, bool viewActivated, bool viewActive);
 bool IsSceneTransformActive();
+void TakeSceneTab();
+void RequestSceneTransform(char key);
+void RequestSceneExtrude();

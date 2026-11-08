@@ -9,6 +9,6 @@ uniform vec3 cameraPos;
 uniform float extent;
 
 void main() {
-    WorldPos = vec3(aPos.x * extent + cameraPos.x, 0.0, aPos.z * extent + cameraPos.z);
+    WorldPos = vec3(aPos.x * extent + cameraPos.x, aPos.z * extent + cameraPos.y, 0.0);
     gl_Position = projection * view * vec4(WorldPos, 1.0);
 }

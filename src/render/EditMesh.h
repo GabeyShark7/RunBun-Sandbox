@@ -19,5 +19,6 @@ struct EditMesh {
     std::vector<EditFace> faces;
 
     void Build(const Mesh& mesh);
+    void Build(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices);
     void Apply(Mesh& mesh) const;
 };

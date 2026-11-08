@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <unordered_map>
 #include <tuple>
 
 static int FindRoot(std::vector<int>& parent, int i) {
@@ -12,13 +13,22 @@ static int FindRoot(std::vector<int>& parent, int i) {
     return i;
 }
 
+struct KeyHash {
+    static size_t Mix(size_t h, long long v) { return h ^ (std::hash<long long>()(v) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2)); }
+    size_t operator()(const std::tuple<long long, long long, long long>& k) const { return Mix(Mix(Mix(0, std::get<0>(k)), std::get<1>(k)), std::get<2>(k)); }
+    size_t operator()(const std::tuple<int, long long, long long, long long>& k) const { return Mix(Mix(Mix(Mix(0, std::get<0>(k)), std::get<1>(k)), std::get<2>(k)), std::get<3>(k)); }
+    size_t operator()(const std::pair<int, int>& k) const { return Mix(Mix(0, k.first), k.second); }
+};
+
 static std::pair<int, int> EdgeKey(int a, int b) {
     return a < b ? std::make_pair(a, b) : std::make_pair(b, a);
 }
 
 void EditMesh::Build(const Mesh& mesh) {
-    const std::vector<Vertex>& vertices = mesh.GetVertices();
-    const std::vector<unsigned int>& indices = mesh.GetIndices();
+    Build(mesh.GetVertices(), mesh.GetIndices());
+}
+
+void EditMesh::Build(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices) {
 
     positions.clear();
     triangles.clear();
@@ -28,8 +38,10 @@ void EditMesh::Build(const Mesh& mesh) {
     renderToUnique.assign(vertices.size(), 0);
     normalGroup.assign(vertices.size(), 0);
 
-    std::map<std::tuple<long long, long long, long long>, int> lookup;
-    std::map<std::tuple<int, long long, long long, long long>, int> groups;
+    std::unordered_map<std::tuple<long long, long long, long long>, int, KeyHash> lookup;
+    lookup.reserve(vertices.size());
+    std::unordered_map<std::tuple<int, long long, long long, long long>, int, KeyHash> groups;
+    groups.reserve(vertices.size());
     for (size_t i = 0; i < vertices.size(); i++) {
         const glm::vec3& p = vertices[i].position;
         auto key = std::make_tuple(llround(p.x * 1e5), llround(p.y * 1e5), llround(p.z * 1e5));
@@ -67,7 +79,8 @@ void EditMesh::Build(const Mesh& mesh) {
     size_t triangleCount = indices.size() / 3;
     std::vector<glm::vec3> normals(triangleCount, glm::vec3(0.0f));
     std::vector<bool> valid(triangleCount, false);
-    std::map<std::pair<int, int>, std::vector<int>> edgeTriangles;
+    std::unordered_map<std::pair<int, int>, std::vector<int>, KeyHash> edgeTriangles;
+    edgeTriangles.reserve(indices.size());
 
     for (size_t t = 0; t < triangleCount; t++) {
         glm::ivec3 tri(renderToUnique[indices[t * 3]], renderToUnique[indices[t * 3 + 1]], renderToUnique[indices[t * 3 + 2]]);
@@ -80,9 +93,11 @@ void EditMesh::Build(const Mesh& mesh) {
 
         normals[t] = cross / area;
         valid[t] = true;
-        edgeTriangles[EdgeKey(tri.x, tri.y)].push_back((int)t);
-        edgeTriangles[EdgeKey(tri.y, tri.z)].push_back((int)t);
-        edgeTriangles[EdgeKey(tri.z, tri.x)].push_back((int)t);
+        // Faces share render points
+        int r0 = (int)indices[t * 3], r1 = (int)indices[t * 3 + 1], r2 = (int)indices[t * 3 + 2];
+        edgeTriangles[EdgeKey(r0, r1)].push_back((int)t);
+        edgeTriangles[EdgeKey(r1, r2)].push_back((int)t);
+        edgeTriangles[EdgeKey(r2, r0)].push_back((int)t);
     }
 
     std::vector<int> parent(triangleCount);
@@ -101,7 +116,7 @@ void EditMesh::Build(const Mesh& mesh) {
         }
     }
 
-    std::map<int, int> rootToFace;
+    std::unordered_map<int, int> rootToFace;
     triangleFace.assign(triangleCount, -1);
     for (size_t t = 0; t < triangleCount; t++) {
         if (!valid[t]) continue;
@@ -119,16 +134,22 @@ void EditMesh::Build(const Mesh& mesh) {
         triangleFace[t] = face;
     }
 
-    std::map<std::pair<int, int>, int> edgeIndex;
+    std::unordered_map<std::pair<int, int>, int, KeyHash> edgeIndex;
     for (EditFace& face : faces) {
-        std::map<std::pair<int, int>, int> counts;
+        std::vector<std::pair<int, int>> sides;
         std::vector<int> faceVertices;
         for (int t : face.triangles) {
             const glm::ivec3& tri = triangles[t];
-            counts[EdgeKey(tri.x, tri.y)]++;
-            counts[EdgeKey(tri.y, tri.z)]++;
-            counts[EdgeKey(tri.z, tri.x)]++;
+            sides.push_back(EdgeKey(tri.x, tri.y));
+            sides.push_back(EdgeKey(tri.y, tri.z));
+            sides.push_back(EdgeKey(tri.z, tri.x));
             faceVertices.insert(faceVertices.end(), { tri.x, tri.y, tri.z });
+        }
+        std::sort(sides.begin(), sides.end());
+        std::vector<std::pair<std::pair<int, int>, int>> counts;
+        for (const auto& side : sides) {
+            if (!counts.empty() && counts.back().first == side) counts.back().second++;
+            else counts.push_back({ side, 1 });
         }
         std::sort(faceVertices.begin(), faceVertices.end());
         faceVertices.erase(std::unique(faceVertices.begin(), faceVertices.end()), faceVertices.end());

@@ -5,6 +5,7 @@
 #include <iostream>
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 glm::mat4 Model::AiMatrixToGlm(const aiMatrix4x4& from) {
     glm::mat4 to;
@@ -22,11 +23,13 @@ bool Model::Load(const std::string& path) {
 
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
         std::cout << "Assimp error: " << importer.GetErrorString() << "\n";
-        LogMessage(std::string("Assimp error: ") + importer.GetErrorString());
+        LogError(std::string("Assimp error: ") + importer.GetErrorString());
         return false;
     }
 
-    ProcessNode(scene->mRootNode, scene, glm::mat4(1.0f));
+    // Files are Y up
+    glm::mat4 zUp = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1, 0, 0));
+    ProcessNode(scene->mRootNode, scene, zUp);
     return true;
 }
 
@@ -60,7 +63,7 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const aiScene* scene, glm::mat4 transform)
             glm::vec3 normal = glm::vec3(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
             vertex.normal = glm::normalize(normalMatrix * normal);
         } else {
-            vertex.normal = glm::vec3(0.0f, 1.0f, 0.0f);
+            vertex.normal = glm::vec3(0.0f, 0.0f, 1.0f);
         }
 
         if (mesh->mTextureCoords[0])
@@ -82,14 +85,18 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const aiScene* scene, glm::mat4 transform)
     return result;
 }
 
-void Model::AddTexture(unsigned int id, const std::string& name) {
-    bool enabledByDefault = textures.empty();
-    textures.push_back({ id, name, enabledByDefault });
+void Model::AddTexture(unsigned int id, const std::string& name, const std::string& path, bool enabled) {
+    TextureInfo info;
+    info.id = id;
+    info.name = name;
+    info.enabled = enabled;
+    info.path = path;
+    textures.push_back(info);
 }
 
 void Model::RemoveTexture(int index) {
     if (index < 0 || index >= (int)textures.size()) return;
-    glDeleteTextures(1, &textures[index].id);
+    // Cached so undo can reuse
     textures.erase(textures.begin() + index);
 }
 
@@ -124,12 +131,10 @@ bool Model::GetBounds(glm::vec3& outMin, glm::vec3& outMax) const {
 void Model::Destroy() {
     for (auto& mesh : meshes) mesh.Destroy();
     meshes.clear();
-
-    for (auto& tex : textures) glDeleteTextures(1, &tex.id);
     textures.clear();
 }
 
-void Model::Draw(unsigned int shaderProgram, glm::mat4 view, glm::mat4 projection, glm::mat4 modelMatrix) {
+void Model::Draw(unsigned int shaderProgram, glm::mat4 view, glm::mat4 projection, glm::mat4 modelMatrix, std::vector<Mesh>* meshesOverride) {
     glUseProgram(shaderProgram);
 
     int enabledCount = 0;
@@ -144,7 +149,7 @@ void Model::Draw(unsigned int shaderProgram, glm::mat4 view, glm::mat4 projectio
     bool conflict = enabledCount > 1;
 
     if (conflict && !conflictLogged) {
-        LogMessage("Texture conflict on '" + modelName + "': more than one texture is enabled. Disable extras to fix.");
+        LogWarning("Texture conflict on '" + modelName + "': more than one texture is enabled. Disable extras to fix.");
         conflictLogged = true;
     } else if (!conflict) {
         conflictLogged = false;
@@ -165,13 +170,28 @@ void Model::Draw(unsigned int shaderProgram, glm::mat4 view, glm::mat4 projectio
     if (!conflict && enabledCount == 1) {
         glUniform1i(hasTexLoc, 1);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, textures[activeIndex].id);
+        const TextureInfo& tex = textures[activeIndex];
+        glBindTexture(GL_TEXTURE_2D, tex.id);
+        GLint wrap = tex.clamp ? GL_CLAMP_TO_EDGE : GL_REPEAT;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap);
         glUniform1i(texLoc, 0);
+        float c = cosf(glm::radians(tex.rotation)), s = sinf(glm::radians(tex.rotation));
+        // Spin and tile at middle
+        glm::mat3 toCenter(1.0f), spin(1.0f), tile(1.0f), back(1.0f);
+        toCenter[2] = glm::vec3(-0.5f, -0.5f, 1.0f);
+        tile[0][0] = tex.tiling.x;
+        tile[1][1] = tex.tiling.y;
+        spin[0] = glm::vec3(c, s, 0.0f);
+        spin[1] = glm::vec3(-s, c, 0.0f);
+        back[2] = glm::vec3(0.5f + tex.offset.x, 0.5f + tex.offset.y, 1.0f);
+        glm::mat3 uvTransform = back * spin * tile * toCenter;
+        glUniformMatrix3fv(glGetUniformLocation(shaderProgram, "uvTransform"), 1, GL_FALSE, glm::value_ptr(uvTransform));
     } else {
         glUniform1i(hasTexLoc, 0);
     }
 
-    for (auto& mesh : meshes) {
+    for (auto& mesh : meshesOverride ? *meshesOverride : meshes) {
         mesh.Draw();
     }
 }

@@ -18057,6 +18057,8 @@ struct ImGuiDockNodeSettings
 // Docking: Forward Declarations
 //-----------------------------------------------------------------------------
 
+static float DockNodeCalcMinSize(ImGuiDockNode* node, ImGuiAxis axis);
+
 namespace ImGui
 {
     // ImGuiDockContext
@@ -19427,6 +19429,8 @@ static void ImGui::DockNodeUpdate(ImGuiDockNode* node)
                 SetNextWindowViewport(node->RefViewportId);
 
             SetNextWindowClass(&node->WindowClass);
+            // Big enough for every part
+            SetNextWindowSizeConstraints(ImVec2(DockNodeCalcMinSize(node, ImGuiAxis_X), DockNodeCalcMinSize(node, ImGuiAxis_Y)), ImVec2(FLT_MAX, FLT_MAX));
 
             // Begin into the host window
             char window_label[20];
@@ -19487,7 +19491,8 @@ static void ImGui::DockNodeUpdate(ImGuiDockNode* node)
 
     // Register a hit-test hole in the window unless we are currently dragging a window that is compatible with our dockspace
     ImGuiDockNode* central_node = node->CentralNode;
-    const bool central_node_hole = node->IsRootNode() && host_window && (node_flags & ImGuiDockNodeFlags_PassthruCentralNode) != 0 && central_node != NULL && central_node->IsEmpty();
+    // Hidden node has old rect
+    const bool central_node_hole = node->IsRootNode() && host_window && (node_flags & ImGuiDockNodeFlags_PassthruCentralNode) != 0 && central_node != NULL && central_node->IsEmpty() && central_node->IsVisible;
     bool central_node_hole_register_hit_test_hole = central_node_hole;
     if (central_node_hole)
         if (const ImGuiPayload* payload = ImGui::GetDragDropPayload())
@@ -20208,10 +20213,22 @@ static void ImGui::DockNodePreviewDockSetup(ImGuiWindow* host_window, ImGuiDockN
             }
         }
 
+    // Too small for that split
+    if (data->SplitDir != ImGuiDir_None)
+    {
+        const ImGuiAxis axis = (data->SplitDir == ImGuiDir_Left || data->SplitDir == ImGuiDir_Right) ? ImGuiAxis_X : ImGuiAxis_Y;
+        const float need = g.Style.WindowMinSize[axis] * 2.0f + g.Style.DockingSeparatorSize;
+        if (data->FutureNode.Size[axis] < need)
+        {
+            data->SplitDir = ImGuiDir_None;
+            data->IsSplitDirExplicit = false;
+        }
+    }
+
     if (!is_outer_docking && !host_window->Collapsed && data->IsCenterAvailable && data->FutureNode.Rect().Contains(g.IO.MousePos))
     {
         const bool fill_empty_space = host_node != NULL && host_node->IsEmpty();
-        if (fill_empty_space || !data->IsSplitDirExplicit)
+        if (fill_empty_space || is_explicit_target || !data->IsSplitDirExplicit)
         {
             data->SplitDir = ImGuiDir_None;
             data->IsSplitDirExplicit = true;
@@ -20470,6 +20487,21 @@ void ImGui::DockNodeTreeMerge(ImGuiContext* ctx, ImGuiDockNode* parent_node, ImG
 
 // Update Pos/Size for a node hierarchy (don't affect child Windows yet)
 // (Depth-first, Pre-Order)
+// Smallest subtree size
+static float DockNodeCalcMinSize(ImGuiDockNode* node, ImGuiAxis axis)
+{
+    ImGuiContext& g = *GImGui;
+    if (node == NULL || !node->IsVisible)
+        return 0.0f;
+    if (node->IsLeafNode())
+        return (node->IsCentralNode() && node->IsEmpty()) ? 0.0f : g.Style.WindowMinSize[axis];
+    float a = DockNodeCalcMinSize(node->ChildNodes[0], axis);
+    float b = DockNodeCalcMinSize(node->ChildNodes[1], axis);
+    if (node->SplitAxis == axis)
+        return (a > 0.0f && b > 0.0f) ? a + b + g.Style.DockingSeparatorSize : a + b;
+    return ImMax(a, b);
+}
+
 void ImGui::DockNodeTreeUpdatePosSize(ImGuiDockNode* node, ImVec2 pos, ImVec2 size, ImGuiDockNode* only_write_to_single_node)
 {
     // During the regular dock node update we write to all nodes.
@@ -20549,6 +20581,18 @@ void ImGui::DockNodeTreeUpdatePosSize(ImGuiDockNode* node, ImVec2 pos, ImVec2 si
             float split_ratio = child_0->SizeRef[axis] / (child_0->SizeRef[axis] + child_1->SizeRef[axis]);
             child_0_size[axis] = ImMax(size_min_each, ImTrunc(size_avail * split_ratio + 0.5f));
             child_1_size[axis] = (size_avail - child_0_size[axis]);
+        }
+
+        // Keep both sides usable
+        const float need_0 = DockNodeCalcMinSize(child_0, axis);
+        const float need_1 = DockNodeCalcMinSize(child_1, axis);
+        if (need_0 + need_1 <= size_avail)
+        {
+            if (child_0_size[axis] < need_0)
+                child_0_size[axis] = need_0;
+            else if (size_avail - child_0_size[axis] < need_1)
+                child_0_size[axis] = size_avail - need_1;
+            child_1_size[axis] = size_avail - child_0_size[axis];
         }
 
         child_1_pos[axis] += spacing + child_0_size[axis];
@@ -21657,7 +21701,7 @@ void ImGui::BeginDockableDragDropTarget(ImGuiWindow* window)
                 if (ImGuiDockNode* root_node = DockNodeGetRootNode(node))
                 {
                     DockNodePreviewDockSetup(window, root_node, payload_window, NULL, &split_outer, is_explicit_target, true);
-                    if (split_outer.IsSplitDirExplicit)
+                    if (split_outer.IsSplitDirExplicit && !is_explicit_target)
                         split_data = &split_outer;
                 }
             if (!node || node->IsLeafNode())

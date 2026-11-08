@@ -1,4 +1,5 @@
 #include "render/Shader.h"
+#include "ui/Console.h"
 #include <glad/glad.h>
 #include <fstream>
 #include <sstream>
@@ -29,6 +30,7 @@ static unsigned int CompileShader(unsigned int type, const std::string& source) 
         char infoLog[512];
         glGetShaderInfoLog(shader, 512, nullptr, infoLog);
         std::cout << "Shader compile error:\n" << infoLog << std::endl;
+        LogError(std::string("Shader compile error: ") + infoLog);
     }
     return shader;
 }
@@ -54,6 +56,7 @@ unsigned int LoadShader(const char* vertexPath, const char* fragmentPath) {
         char infoLog[512];
         glGetProgramInfoLog(program, 512, nullptr, infoLog);
         std::cout << "Shader link error:\n" << infoLog << std::endl;
+        LogError(std::string("Shader link error: ") + infoLog);
     }
 
     // shaders are now linked

@@ -1,52 +1,24 @@
 #include "ui/MenuBar.h"
+#include "ui/RenderExport.h"
 #include "imgui/imgui.h"
 #include "ui/FileDialog.h"
 #include "core/UISettings.h"
 #include "imgui/imgui_internal.h"
-#include "ui/EditMode.h"
 #include "ui/RoomWindow.h"
 #include "ui/UpdateWindow.h"
+#include "ui/HelpWindow.h"
+#include "ui/SceneCommands.h"
+#include "ui/Workspaces.h"
+#include "ui/DockLayout.h"
+#include "render/SceneRenderer.h"
+#include <cstdio>
 #include <iostream>
 
 // not the best, i know. Will fix later. (probably not)
 
-static void SetWorkMode(UISettings& settings, int mode) {
-    if (settings.workMode == mode) return;
-    settings.workMode = mode;
-    if (mode == WorkMode_Tinker) ExitEditMode();
-    ImGui::MarkIniSettingsDirty();
-}
-
-static float DrawWorkModeSwitcher(UISettings& settings) {
-    const char* names[2] = { "Tinker", "Mix" };
-    const char* tips[2] = {
-        "Simple shapes and click-and-drag building",
-        "Simple tools plus mesh editing and shortcuts",
-    };
-
-    ImGuiStyle& style = ImGui::GetStyle();
-    ImVec2 padding = ImVec2(12.0f, 4.0f);
-    float total = 0.0f;
-    for (const char* name : names) total += ImGui::CalcTextSize(name).x + padding.x * 2.0f;
-    total += 4.0f;
-
-    float barHeight = ImGui::GetWindowHeight();
-    float buttonHeight = ImGui::GetFontSize() + padding.y * 2.0f;
-    float left = ImGui::GetWindowWidth() - total - 16.0f;
-    ImGui::SetCursorPos(ImVec2(left, (barHeight - buttonHeight) * 0.5f));
-
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, padding);
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, style.ItemSpacing.y));
-    for (int i = 0; i < 2; i++) {
-        bool active = settings.workMode == i;
-        if (active) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-        if (ImGui::Button(names[i])) SetWorkMode(settings, i);
-        if (active) ImGui::PopStyleColor();
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tips[i]);
-        if (i < 1) ImGui::SameLine();
-    }
-    ImGui::PopStyleVar(2);
-    return left;
+static void ShowAllPanels(UISettings& settings) {
+    settings.showScene = settings.showObjects = settings.showProperties = settings.showEdit = settings.showMessages = true;
+    settings.showShapes = settings.showMods = true;
 }
 
 void DrawMenuBar(GLFWwindow* sandbox_window, SceneRenderer& sceneRenderer) {
@@ -55,7 +27,17 @@ void DrawMenuBar(GLFWwindow* sandbox_window, SceneRenderer& sceneRenderer) {
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 10.0f));
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("Import")) {
+            if (ImGui::MenuItem("New Scene", "Ctrl+N")) CommandNew();
+            if (ImGui::MenuItem("Open Scene...", "Ctrl+O")) CommandOpen();
+            ImGui::Separator();
+            if (ImGui::MenuItem("Save Scene", "Ctrl+S")) CommandSave(sceneRenderer);
+            if (ImGui::MenuItem("Save Scene As...", "Ctrl+Shift+S")) CommandSaveAs(sceneRenderer);
+            ImGui::Separator();
+            if (ImGui::MenuItem("Export Models...", "Ctrl+E")) OpenExportModels();
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Save the picked objects (or everything) as GLB, FBX, OBJ, STL and more, with their images");
+            if (ImGui::MenuItem("Render Image...", "F12")) OpenRenderImage();
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Save a picture of the Scene with materials, lights and shadows");
+            if (ImGui::MenuItem("Import Model...")) {
                 std::string path = OpenFileDialog();
                 if (!path.empty()) {
                     sceneRenderer.LoadModel(path);
@@ -63,25 +45,64 @@ void DrawMenuBar(GLFWwindow* sandbox_window, SceneRenderer& sceneRenderer) {
             }
             ImGui::EndMenu();
         }
+        if (ImGui::BeginMenu("Edit")) {
+            bool objectsPicked = HasObjectSelection(sceneRenderer);
+            if (ImGui::MenuItem("Undo", "Ctrl+Z", false, CanUndo())) CommandUndo(sceneRenderer);
+            if (ImGui::MenuItem("Redo", "Ctrl+Y", false, CanRedo())) CommandRedo(sceneRenderer);
+            ImGui::Separator();
+            if (ImGui::MenuItem("Duplicate", "Ctrl+D", false, objectsPicked)) CommandDuplicate(sceneRenderer, false);
+            if (ImGui::MenuItem("Delete", "Del", false, objectsPicked)) CommandDelete(sceneRenderer);
+            if (ImGui::MenuItem("Join Objects", "J", false, objectsPicked && sceneRenderer.GetSelection().size() > 1)) CommandJoin(sceneRenderer);
+            if (ImGui::MenuItem("Rename", "F2", false, objectsPicked)) CommandRename(sceneRenderer);
+            ImGui::Separator();
+            if (ImGui::MenuItem("Group", "Ctrl+G", false, objectsPicked && sceneRenderer.GetSelection().size() > 1)) CommandGroup(sceneRenderer);
+            if (ImGui::MenuItem("Ungroup", "Ctrl+Shift+G", false, objectsPicked)) CommandUngroup(sceneRenderer);
+            if (ImGui::MenuItem("Solid or Hole", "H", false, objectsPicked)) CommandToggleHole(sceneRenderer);
+            if (ImGui::MenuItem("Drop to Ground", "D", false, objectsPicked)) CommandDrop(sceneRenderer);
+            if (ImGui::MenuItem("Align...", "L", false, objectsPicked && sceneRenderer.GetSelection().size() > 1)) CommandAlign();
+            if (ImGui::MenuItem("Mirror...", "M", false, objectsPicked)) CommandMirror();
+            ImGui::Separator();
+            if (ImGui::MenuItem("Select All", "A", false, !sceneRenderer.GetObjects().empty())) CommandSelectAll(sceneRenderer);
+            if (ImGui::MenuItem("Focus on Selected", "F")) CommandFocus(sceneRenderer);
+            ImGui::EndMenu();
+        }
         if (ImGui::BeginMenu("View")) {
             bool changed = false;
+            ImGui::TextDisabled("Tabs");
+            for (int i = 0; i < Workspace_Count; i++) {
+                char keys[16];
+                snprintf(keys, sizeof(keys), "Ctrl+%d", i + 1);
+                if (ImGui::MenuItem(WorkspaceTitle(i), keys, settings.workspace == i, WorkspaceAllowed(i))) SetWorkspace(sceneRenderer, i);
+            }
+            ImGui::Separator();
+            bool layoutTab = settings.workspace == Workspace_Layout;
+            ImGui::TextDisabled(layoutTab ? "Panels" : "Panels (Layout tab)");
+            ImGui::BeginDisabled(!layoutTab);
             changed |= ImGui::MenuItem("Scene", nullptr, &settings.showScene);
             changed |= ImGui::MenuItem("Objects", nullptr, &settings.showObjects);
             changed |= ImGui::MenuItem("Properties", nullptr, &settings.showProperties);
+            changed |= ImGui::MenuItem("Shapes", nullptr, &settings.showShapes);
+            changed |= ImGui::MenuItem("Object Mods", settings.workMode == WorkMode_Tinker ? "Mix mode" : nullptr, &settings.showMods, settings.workMode != WorkMode_Tinker);
+            changed |= ImGui::MenuItem("Edit##EditPanel", settings.workMode == WorkMode_Tinker ? "Mix mode" : nullptr, &settings.showEdit, settings.workMode != WorkMode_Tinker);
+            changed |= ImGui::MenuItem("Messages", nullptr, &settings.showMessages);
             changed |= ImGui::MenuItem("Console", nullptr, &settings.showConsole);
-            changed |= ImGui::MenuItem("Edit", nullptr, &settings.showEdit, settings.workMode != WorkMode_Tinker);
+            ImGui::EndDisabled();
             ImGui::Separator();
             changed |= ImGui::MenuItem("Grid", nullptr, &settings.showGrid);
+            changed |= ImGui::MenuItem("Statistics", nullptr, &settings.showStatistics);
             ImGui::Separator();
-            if (ImGui::MenuItem("Float All Panels")) {
-                settings.showScene = settings.showObjects = settings.showProperties = settings.showConsole = settings.showEdit = true;
-                settings.layoutMode = LayoutMode_Floating;
+            ImGui::TextDisabled("Layout");
+            changed |= ImGui::MenuItem("Lock Layout", nullptr, &settings.lockLayout);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Stops panels from being dragged around by accident");
+            if (ImGui::MenuItem("Reset Layout")) {
+                ShowAllPanels(settings);
+                settings.layoutMode = LayoutMode_Docked;
                 settings.resetLayout = true;
                 changed = true;
             }
-            if (ImGui::MenuItem("Dock All Panels")) {
-                settings.showScene = settings.showObjects = settings.showProperties = settings.showConsole = settings.showEdit = true;
-                settings.layoutMode = LayoutMode_Docked;
+            if (ImGui::MenuItem("Float All Panels")) {
+                ShowAllPanels(settings);
+                settings.layoutMode = LayoutMode_Floating;
                 settings.resetLayout = true;
                 changed = true;
             }
@@ -94,20 +115,38 @@ void DrawMenuBar(GLFWwindow* sandbox_window, SceneRenderer& sceneRenderer) {
         }
         if (ImGui::BeginMenu("Room")) {
             bool inRoom = IsInRoom();
-            if (ImGui::MenuItem("Create", nullptr, false, !inRoom)) OpenRoomCreate();
-            if (ImGui::MenuItem("Join", nullptr, false, !inRoom)) OpenRoomJoin();
+            if (ImGui::MenuItem("Create Room", nullptr, false, !inRoom)) OpenRoomCreate();
+            if (ImGui::MenuItem("Join Room...", nullptr, false, !inRoom)) OpenRoomJoin();
             ImGui::Separator();
-            if (ImGui::MenuItem("Show Room")) ShowRoomWindow();
+            if (ImGui::MenuItem("Show Room Panel")) {
+                SetWorkspace(sceneRenderer, Workspace_Layout);
+                ShowRoomWindow();
+            }
+            if (ImGui::MenuItem("Show Messages", nullptr, false, !settings.showMessages || settings.workspace != Workspace_Layout)) {
+                SetWorkspace(sceneRenderer, Workspace_Layout);
+                settings.showMessages = true;
+                ImGui::MarkIniSettingsDirty();
+            }
             if (ImGui::MenuItem(IsHostingRoom() ? "Close Room" : "Leave Room", nullptr, false, inRoom)) LeaveRoom();
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("About")) {
+            if (ImGui::MenuItem("Help and Shortcuts", "F1")) ShowHelpWindow();
             if (ImGui::MenuItem("Updates...")) ShowUpdateWindow();
             ImGui::EndMenu();
         }
-        float switcherLeft = DrawWorkModeSwitcher(settings);
-        DrawUpdateBadge(switcherLeft - 10.0f);
+
+        ImGui::Separator();
+        DrawWorkspaceTabs(sceneRenderer);
+        ImGui::Separator();
+
+        ImGui::TextDisabled("%s mode", settings.workMode == WorkMode_Tinker ? "Tinker" : "Mix");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Change this in View > Preferences > General");
+
+        DrawUpdateBadge(ImGui::GetWindowWidth() - 16.0f);
         ImGui::EndMainMenuBar();
     }
     ImGui::PopStyleVar();
+
+    if (ImGui::IsKeyPressed(ImGuiKey_F1, false)) ShowHelpWindow();
 }

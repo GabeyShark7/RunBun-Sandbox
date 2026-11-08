@@ -2416,6 +2416,7 @@ dependencies = [
 name = "runbun-net"
 version = "0.1.0"
 dependencies = [
+ "cbor4ii",
  "futures",
  "hmac 0.12.1",
  "libp2p",

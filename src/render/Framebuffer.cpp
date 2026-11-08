@@ -1,6 +1,7 @@
 // LOTS OF MACHINE MAGIC... THANK YOU CLAUDE. THANK YOU GLAD.
 
 #include "render/Framebuffer.h"
+#include "ui/Console.h"
 #include <iostream>
 
 void Framebuffer::Init(int w, int h) {
@@ -28,8 +29,10 @@ void Framebuffer::Init(int w, int h) {
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
 
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
         std::cout << "Framebuffer is not complete!\n"; // sanity check which catches setup mistakes
+        LogError("The scene view could not be set up on this graphics card.");
+    }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // unbind back to rendering to the actual screen for now
 }

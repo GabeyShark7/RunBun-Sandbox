@@ -15,11 +15,14 @@ public:
     void Draw();
     void Destroy();
     void UpdateVertices(const std::vector<Vertex>& vertices);
+    void Rebuild(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices);
     const std::vector<Vertex>& GetVertices() const { return cpuVertices; }
     const std::vector<unsigned int>& GetIndices() const { return cpuIndices; }
 
     glm::vec3 boundsMin = glm::vec3(0.0f);
     glm::vec3 boundsMax = glm::vec3(0.0f);
+    // Changes on every edit
+    unsigned int revision = 0;
 
 private:
     unsigned int VAO, VBO, EBO;

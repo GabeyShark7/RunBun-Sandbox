@@ -1,6 +1,7 @@
 #include "core/Input.h"
 #include "ui/SceneWindow.h" // needed for IsSceneHovered()
 #include "ui/SceneGizmo.h"
+#include "core/UISettings.h"
 
 static Camera* activeCamera = nullptr;
 static bool rightMouseHeld = false;
@@ -22,7 +23,7 @@ void UpdateInput(GLFWwindow* window, float deltaTime) {
     bool rightPressed = isRightMouseDown && !rightMouseWasDown;
     rightMouseWasDown = isRightMouseDown;
 
-    if (rightPressed && !rightMouseHeld && !ctrlDown && !IsSceneTransformActive() && IsSceneHovered()) {
+    if (rightPressed && !rightMouseHeld && !ctrlDown && !IsSceneTransformActive() && IsSceneHovered() && !GetUISettings().cameraOrbit) {
         // only START look mode if right click began while hovering the Scene panel
         rightMouseHeld = true;
         activeCamera->firstMouse = true;

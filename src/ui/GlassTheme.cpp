@@ -15,10 +15,10 @@ struct ThemePreset {
 
 static const ThemePreset themes[] = {
     { "Dark",
-      ImVec4(0.07f, 0.07f, 0.09f, 1.0f), ImVec4(0.16f, 0.16f, 0.20f, 1.0f),
-      ImVec4(0.95f, 0.95f, 0.97f, 1.0f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
-      ImVec4(1.0f, 1.0f, 1.0f, 0.14f), ImVec4(0.13f, 0.13f, 0.17f, 0.97f),
-      ImVec4(0.55f, 0.45f, 1.0f, 1.0f), 0.0f },
+      ImVec4(0.075f, 0.075f, 0.075f, 1.0f), ImVec4(0.135f, 0.135f, 0.135f, 1.0f),
+      ImVec4(0.92f, 0.92f, 0.92f, 1.0f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
+      ImVec4(1.0f, 1.0f, 1.0f, 0.06f), ImVec4(0.16f, 0.16f, 0.16f, 1.0f),
+      ImVec4(0.26f, 0.56f, 0.96f, 1.0f), 0.0f },
     { "Light",
       ImVec4(0.86f, 0.87f, 0.91f, 1.0f), ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
       ImVec4(0.10f, 0.11f, 0.15f, 1.0f), ImVec4(0.0f, 0.0f, 0.0f, 1.0f),
@@ -114,14 +114,15 @@ void ApplyGlassStyle(const UISettings& settings) {
     style.ScrollbarRounding = r;
     style.TabRounding = r * 0.6f;
     style.TabBarBorderSize = 0.0f;
-    style.TabBarOverlineSize = 0.0f;
+    style.TabBarOverlineSize = 2.0f;
     style.TabCloseButtonMinWidthSelected = FLT_MAX;
     style.TabCloseButtonMinWidthUnselected = FLT_MAX;
 
-    style.WindowBorderSize = 1.0f;
+    // Flat look
+    style.WindowBorderSize = 0.0f;
     style.ChildBorderSize = 1.0f;
     style.PopupBorderSize = 1.0f;
-    style.FrameBorderSize = 1.0f;
+    style.FrameBorderSize = 0.0f;
     style.TabBorderSize = 0.0f;
 
     style.WindowPadding = ImVec2(14.0f, 12.0f);
@@ -149,7 +150,7 @@ void ApplyGlassStyle(const UISettings& settings) {
     colors[ImGuiCol_FrameBgActive] = WithAlpha(overlay, 0.20f);
 
     colors[ImGuiCol_TitleBg] = WithAlpha(theme.glassTint, Clamp01(glass + 0.05f));
-    colors[ImGuiCol_TitleBgActive] = WithAlpha(Mix(theme.glassTint, accent, 0.18f), Clamp01(glass + 0.12f));
+    colors[ImGuiCol_TitleBgActive] = WithAlpha(theme.glassTint, Clamp01(glass + 0.12f));
     colors[ImGuiCol_TitleBgCollapsed] = WithAlpha(theme.glassTint, glass * 0.7f);
     colors[ImGuiCol_MenuBarBg] = WithAlpha(theme.glassTint, Clamp01(glass + 0.10f));
 
@@ -180,11 +181,11 @@ void ApplyGlassStyle(const UISettings& settings) {
 
     colors[ImGuiCol_Tab] = WithAlpha(overlay, 0.0f);
     colors[ImGuiCol_TabHovered] = WithAlpha(overlay, 0.10f);
-    colors[ImGuiCol_TabSelected] = WithAlpha(overlay, 0.08f);
-    colors[ImGuiCol_TabSelectedOverline] = WithAlpha(accent, 0.0f);
+    colors[ImGuiCol_TabSelected] = WithAlpha(overlay, 0.07f);
+    colors[ImGuiCol_TabSelectedOverline] = accent;
     colors[ImGuiCol_TabDimmed] = WithAlpha(overlay, 0.0f);
     colors[ImGuiCol_TabDimmedSelected] = WithAlpha(overlay, 0.05f);
-    colors[ImGuiCol_TabDimmedSelectedOverline] = WithAlpha(accent, 0.0f);
+    colors[ImGuiCol_TabDimmedSelectedOverline] = WithAlpha(accent, 0.45f);
 
     colors[ImGuiCol_DockingPreview] = WithAlpha(accent, 0.55f);
     colors[ImGuiCol_DockingEmptyBg] = WithAlpha(overlay, 0.0f);
